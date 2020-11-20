@@ -3,7 +3,6 @@ const axios = require("axios");
 const avro = require("avsc");
 const fs = require("fs/promises");
 
-let AUTH;
 
 /**
  * object that provides a jwt that can be used for talking to streammachine.
@@ -22,7 +21,6 @@ function Auth(url, billingid, clientid, secret) {
 
     /**
      * returns a promise with an authorization.
-     *
      *
      * @returns {Promise<unknown>} Value is not used.
      */
@@ -66,14 +64,56 @@ function Auth(url, billingid, clientid, secret) {
     }
 }
 
-/**
- *
- * @param type
- * @param schemaId
- */
-function send_event(type, schemaId) {
 
-    let event = {
+function Client() {
+
+    this.init = function(){
+        this.schemaId = "clickstream";
+        let url = "https" + "://" + "auth.dev.strm.services"
+        return new Promise((resolve,reject) => {
+            fs.readFile("credentials.json").then(data => {
+                let credentials = JSON.parse(data);
+                this.auth = new Auth(url, credentials.IN.billingId, credentials.IN.clientId, credentials.IN.secret);
+                this.auth.authenticate().then( _ => {
+                    fs.readFile(`schema-cache/${this.schemaId}.avsc`).then(data => {
+                        this.type = avro.Type.forSchema(JSON.parse(data));
+                        resolve(this);
+                    });
+                })
+                .catch(error => reject(error))
+            });
+        })
+    }
+    this.send_event = function(event) {
+        event.strmMeta.schemaId=this.schemaId;
+        event.strmMeta.nonce=0
+        event.strmMeta.timestamp=0
+        const request_config = {
+            method: "post",
+            url: "http://gateway-internal.core.svc/event",
+            headers: {
+                "Authorization": "Bearer " + this.auth.getBearerHeaderValue(),
+                "Content-Type": "application/octet-stream",
+                "Strm-Serialization-Type": "application/x-avro-binary",
+                "Strm-Schema-Id": this.schemaId
+            },
+            data: this.type.toBuffer(event)
+        };
+        axios(request_config)
+            .then(res => {
+                console.log(request_config.url, res.status);
+            })
+            .catch(error => {
+                console.error(error);
+            })
+
+    }
+}
+
+/** create a dummy event.
+ */
+function create_event() {
+    return {
         abTests: ["abc"],
         eventType: "button x clicked",
         customer: {id: "customer-id"},
@@ -83,53 +123,19 @@ function send_event(type, schemaId) {
         conversion: 1,
         url: "https://portal.streammachine.io/",
         strmMeta: {
-            timestamp: 0, // filled in at gateway.
-            schemaId: schemaId,
-            nonce: 0, // filled in at gateway
+            // the other fields are filled in by the Client
             consentLevels: [0, 1, 2],
         }
     }
-    const buf = type.toBuffer(event);
-
-    const request_config = {
-        method: "post",
-        url: "http://gateway-internal.core.svc/event",
-        headers: {
-            "Authorization": "Bearer " + AUTH.getBearerHeaderValue(),
-            "Content-Type": "application/octet-stream",
-            "Strm-Serialization-Type": "application/x-avro-binary",
-            "Strm-Schema-Id": schemaId
-        },
-        data: buf
-    };
-    axios(request_config)
-        .then(res => {
-            console.log(request_config.url, res.status);
-        })
-        .catch(error => {
-            console.error(error);
-        })
 }
 
 async function startup() {
-    let schemaId = "clickstream";
-    let url = "https" + "://" + "auth.dev.strm.services"
-
-    fs.readFile("credentials.json").then(data => {
-        let creds = JSON.parse(data);
-        AUTH = new Auth(url, creds.IN.billingId, creds.IN.clientId, creds.IN.secret);
-        AUTH.authenticate().then( _ => {
-            fs.readFile(`schema-cache/${schemaId}.avsc`).then(data => {
-                let type = avro.Type.forSchema(JSON.parse(data));
-                setInterval(() => send_event(type, schemaId), 500);
-            });
-        });
-
-
-
-    });
+    new Client().init()
+        .then(client => {
+            setInterval(() => client.send_event(create_event()), 500);
+        })
+        .catch(error => console.error(error));
     await new Promise(r => setTimeout(r, 86400000));
-
 }
 
 startup();
