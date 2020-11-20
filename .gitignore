@@ -1,1 +1,2 @@
-*.avsc
+credentials.json
+schema-cache/
