@@ -1,4 +1,4 @@
-const Client = require('./streammachine')
+const streammachine = require('./streammachine')
 
 
 /** create a dummy event.
@@ -21,7 +21,7 @@ function create_event() {
 }
 
 async function startup() {
-    new Client().init()
+    new streammachine.Sender().init()
         .then(client => {
             setInterval(() => client.send_event(create_event()), 500);
         })

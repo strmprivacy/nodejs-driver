@@ -2,6 +2,7 @@
 const axios = require("axios");
 const avro = require("avsc");
 const fs = require("fs/promises");
+const Websocket = require("ws")
 
 
 /**
@@ -67,7 +68,7 @@ function Auth(url, billingid, clientid, secret) {
 }
 
 
-function Client() {
+function Sender() {
     this.gatewayUrl = "http://gateway-internal.core.svc/event";
     this.schemaId = "clickstream";
     let authUrl = "https" + "://" + "auth.dev.strm.services"
@@ -111,4 +112,84 @@ function Client() {
     }
 }
 
-module.exports = Client
+function WsReceiver(callback) {
+    this.egressUrl = "ws://egress-internal.core.svc";
+    this.schemaUrl = "http://egress-internal.core.svc";
+    this.schemaId = "clickstream";
+    let authUrl = "https" + "://" + "auth.dev.strm.services"
+    let credentialsFile = "credentials.json";
+    this.schemaCache = {}
+    this.callback = callback;
+
+    this.init = function(streamnr){
+        return new Promise((resolve,reject) => {
+            fs.readFile(credentialsFile).then(data => {
+                let credentials = JSON.parse(data);
+                let billingId = credentials.IN.billingId;
+                if (streamnr === undefined) {
+                    credentials = credentials.IN;
+                }
+                else {
+                    credentials = credentials.OUT[streamnr];
+                }
+                this.auth = new Auth(authUrl, billingId, credentials.clientId, credentials.secret);
+                this.auth.authenticate().then( _ => {
+                    resolve(this);
+                }).catch(error => reject(error))
+            });
+        })
+    }
+    this.connect_ws = function() {
+        this.ws = new Websocket(`${this.egressUrl}/ws`, {
+            headers: {
+                Authorization: "Bearer "+ this.auth.getBearerHeaderValue()
+            }
+        })
+        this.ws.on('open', () => {
+            console.debug("websocket connected");
+        })
+        this.ws.on('close', () => {
+            console.debug("websocket disconnected");
+            delete this.ws;
+        })
+        this.ws.on('message', (message) => {
+
+            // the base64 is a consequence from the fact that our current Egress websocket implementation
+            // cannot send binary packets. As a quick-and-dirty workaround, I've put in a base64 encoding.
+            // TODO send bloody binaries.
+            let buf = Buffer.from(message, 'base64')
+            // these two lines are only valid for a Confluent type message wrapper.
+            let schemaId = buf.readUInt32BE(1);
+            let avroPayload = buf.slice(5)
+
+            this.getSchemaById(schemaId).then(schema => {
+                    let decoded = schema.fromBuffer(avroPayload);
+                    this.callback(decoded);
+                })
+
+        })
+    }
+
+    /**
+     * return a Promise to avsc interpreted schema definition.
+     * @param schemaId
+     */
+    this.getSchemaById = function(schemaId) {
+        let schema = this.schemaCache[schemaId];
+        if(schema === undefined) {
+            this.schemaCache[schemaId] = new Promise((resolve,reject) => {
+                // retrieve the schema from the Confluent schema registry (proxied by the egress).
+                axios.get(`${this.schemaUrl}/schemas/ids/${schemaId}`, {
+                    headers: { "Authorization": this.auth.getBearerHeaderValue() }
+                }).then(result => {
+                    let type = avro.Type.forSchema(JSON.parse(result.data.schema));
+                    console.log(`Retrieved schema for ${schemaId}`)
+                    resolve(type);
+                })
+            })
+        }
+        return this.schemaCache[schemaId];
+    }
+}
+
+module.exports = {Sender, WsReceiver}
