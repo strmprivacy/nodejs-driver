@@ -1,10 +1,18 @@
 
 const axios = require("axios");
 const avro = require("avsc");
-const fs = require("fs");
+const fs = require("fs/promises");
 
 let AUTH;
 
+/**
+ * object that provides a jwt that can be used for talking to streammachine.
+ * @param url
+ * @param billingid
+ * @param clientid
+ * @param secret
+ * @constructor
+ */
 function Auth(url, billingid, clientid, secret) {
     this.baseurl=url;
     this.billingid = billingid;
@@ -58,6 +66,11 @@ function Auth(url, billingid, clientid, secret) {
     }
 }
 
+/**
+ *
+ * @param type
+ * @param schemaId
+ */
 function send_event(type, schemaId) {
 
     let event = {
@@ -65,14 +78,14 @@ function send_event(type, schemaId) {
         eventType: "button x clicked",
         customer: {id: "customer-id"},
         referrer: "https://www.streammachine.io",
-        userAgent: "nodjs",
+        userAgent: "node-js",
         producerSessionId: "prodsesid",
         conversion: 1,
         url: "https://portal.streammachine.io/",
         strmMeta: {
             timestamp: 0, // filled in at gateway.
             schemaId: schemaId,
-            nonce: 0,
+            nonce: 0, // filled in at gateway
             consentLevels: [0, 1, 2],
         }
     }
@@ -100,23 +113,24 @@ function send_event(type, schemaId) {
 
 async function startup() {
     let schemaId = "clickstream";
-    fs.readFile("credentials.json", (err, data) => {
+    let url = "https" + "://" + "auth.dev.strm.services"
+
+    fs.readFile("credentials.json").then(data => {
         let creds = JSON.parse(data);
-        let url = "https" + "://" + "auth.dev.strm.services"
         AUTH = new Auth(url, creds.IN.billingId, creds.IN.clientId, creds.IN.secret);
-        AUTH.authenticate()
-            .then( _ => {
-                fs.readFile(`schema-cache/${schemaId}.avsc`, 'utf8', (err, data) => {
-                    let type = avro.Type.forSchema(JSON.parse(data));
-                    setInterval(() => send_event(type, schemaId), 500);
-                });
+        AUTH.authenticate().then( _ => {
+            fs.readFile(`schema-cache/${schemaId}.avsc`).then(data => {
+                let type = avro.Type.forSchema(JSON.parse(data));
+                setInterval(() => send_event(type, schemaId), 500);
+            });
+        });
 
 
-            })
 
     });
     await new Promise(r => setTimeout(r, 86400000));
 
 }
+
 startup();
 
