@@ -1,4 +1,4 @@
-
+"use strict";
 const axios = require("axios");
 const avro = require("avsc");
 const fs = require("fs/promises");
@@ -22,7 +22,9 @@ function Auth(url, billingid, clientid, secret) {
     /**
      * returns a promise with an authorization.
      *
-     * @returns {Promise<unknown>} Value is not used.
+     * The authorization is either direct or a refresh token
+     *
+     * @returns {Promise<Auth.refresh>} Value is not used.
      */
     this.authenticate = function() {
         return new Promise((resolve, reject) => {
@@ -66,21 +68,22 @@ function Auth(url, billingid, clientid, secret) {
 
 
 function Client() {
+    this.gatewayUrl = "http://gateway-internal.core.svc/event";
+    this.schemaId = "clickstream";
+    let authUrl = "https" + "://" + "auth.dev.strm.services"
+    let credentialsFile = "credentials.json";
 
     this.init = function(){
-        this.schemaId = "clickstream";
-        let url = "https" + "://" + "auth.dev.strm.services"
         return new Promise((resolve,reject) => {
-            fs.readFile("credentials.json").then(data => {
+            fs.readFile(credentialsFile).then(data => {
                 let credentials = JSON.parse(data);
-                this.auth = new Auth(url, credentials.IN.billingId, credentials.IN.clientId, credentials.IN.secret);
+                this.auth = new Auth(authUrl, credentials.IN.billingId, credentials.IN.clientId, credentials.IN.secret);
                 this.auth.authenticate().then( _ => {
                     fs.readFile(`schema-cache/${this.schemaId}.avsc`).then(data => {
                         this.type = avro.Type.forSchema(JSON.parse(data));
                         resolve(this);
                     });
-                })
-                .catch(error => reject(error))
+                }).catch(error => reject(error))
             });
         })
     }
@@ -90,7 +93,7 @@ function Client() {
         event.strmMeta.timestamp=0
         const request_config = {
             method: "post",
-            url: "http://gateway-internal.core.svc/event",
+            url: this.gatewayUrl,
             headers: {
                 "Authorization": "Bearer " + this.auth.getBearerHeaderValue(),
                 "Content-Type": "application/octet-stream",
@@ -99,44 +102,13 @@ function Client() {
             },
             data: this.type.toBuffer(event)
         };
-        axios(request_config)
-            .then(res => {
-                console.log(request_config.url, res.status);
-            })
-            .catch(error => {
-                console.error(error);
-            })
-
-    }
-}
-
-/** create a dummy event.
- */
-function create_event() {
-    return {
-        abTests: ["abc"],
-        eventType: "button x clicked",
-        customer: {id: "customer-id"},
-        referrer: "https://www.streammachine.io",
-        userAgent: "node-js",
-        producerSessionId: "prodsesid",
-        conversion: 1,
-        url: "https://portal.streammachine.io/",
-        strmMeta: {
-            // the other fields are filled in by the Client
-            consentLevels: [0, 1, 2],
-        }
-    }
-}
-
-async function startup() {
-    new Client().init()
-        .then(client => {
-            setInterval(() => client.send_event(create_event()), 500);
+        axios(request_config).then(res => {
+            console.log(request_config.url, res.status);
+        }).catch(error => {
+            console.error(error);
         })
-        .catch(error => console.error(error));
-    await new Promise(r => setTimeout(r, 86400000));
+
+    }
 }
 
-startup();
-
+module.exports = Client
