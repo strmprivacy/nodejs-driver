@@ -40,9 +40,7 @@ function Auth(url, billingid, clientid, secret) {
             }
             else {
                 url = this.baseurl + "/refresh";
-                payload = {
-                    "refreshToken": this.refresh.refreshToken
-                };
+                payload = { "refreshToken": this.refresh.refreshToken };
             }
 
             axios
@@ -63,22 +61,33 @@ function Auth(url, billingid, clientid, secret) {
         })
     }
     this.getBearerHeaderValue = function(){
-        return this.refresh.idToken;
+        return "Bearer " + this.refresh.idToken;
     }
 }
 
+function setupDefaults(config) {
+    let defaults = {
+        gatewayUrl: "https://in.strm.services/event",
+        authUrl: "https://auth.strm.services",
+        egressUrl: "wss://out.strm.services",
+        schemaUrl: "https://out.strm.services",
+        credentialsFile: "credentials.json"
+    }
+    Object.assign(defaults, config);
+    return defaults;
 
-function Sender() {
-    this.gatewayUrl = "http://gateway-internal.core.svc/event";
-    this.schemaId = "clickstream";
-    let authUrl = "https" + "://" + "auth.dev.strm.services"
-    let credentialsFile = "credentials.json";
+}
+
+function Sender(config, schemaId) {
+    config = setupDefaults(config);
+    this.gatewayUrl = config.gatewayUrl;
+    this.schemaId = schemaId;
 
     this.init = function(){
         return new Promise((resolve,reject) => {
-            fs.readFile(credentialsFile).then(data => {
+            fs.readFile(config.credentialsFile).then(data => {
                 let credentials = JSON.parse(data);
-                this.auth = new Auth(authUrl, credentials.IN.billingId, credentials.IN.clientId, credentials.IN.secret);
+                this.auth = new Auth(config.authUrl, credentials.IN.billingId, credentials.IN.clientId, credentials.IN.secret);
                 this.auth.authenticate().then( _ => {
                     fs.readFile(`schema-cache/${this.schemaId}.avsc`).then(data => {
                         this.type = avro.Type.forSchema(JSON.parse(data));
@@ -96,7 +105,7 @@ function Sender() {
             method: "post",
             url: this.gatewayUrl,
             headers: {
-                "Authorization": "Bearer " + this.auth.getBearerHeaderValue(),
+                "Authorization": this.auth.getBearerHeaderValue(),
                 "Content-Type": "application/octet-stream",
                 "Strm-Serialization-Type": "application/x-avro-binary",
                 "Strm-Schema-Id": this.schemaId
@@ -112,28 +121,34 @@ function Sender() {
     }
 }
 
-function WsReceiver(callback) {
-    this.egressUrl = "ws://egress-internal.core.svc";
-    this.schemaUrl = "http://egress-internal.core.svc";
-    this.schemaId = "clickstream";
-    let authUrl = "https" + "://" + "auth.dev.strm.services"
-    let credentialsFile = "credentials.json";
+/**
+ * Start up a websocket receiver
+ *
+ * @param config overrides for default configs.
+ * @param callback the function to be called with a decoded message.
+ * @constructor
+ */
+function WsReceiver(config, callback) {
+    config = setupDefaults(config);
+    this.egressUrl = config.egressUrl; //"ws://egress-internal.core.svc";
+    this.schemaUrl = config.schemaUrl;
     this.schemaCache = {}
     this.callback = callback;
 
+    /**
+     * initialize the Websocket receiver.
+     * @param streamnr
+     * @returns {Promise<unknown>}
+     */
     this.init = function(streamnr){
         return new Promise((resolve,reject) => {
-            fs.readFile(credentialsFile).then(data => {
+            fs.readFile(config.credentialsFile).then(data => {
                 let credentials = JSON.parse(data);
                 let billingId = credentials.IN.billingId;
-                if (streamnr === undefined) {
-                    credentials = credentials.IN;
-                }
-                else {
-                    credentials = credentials.OUT[streamnr];
-                }
-                this.auth = new Auth(authUrl, billingId, credentials.clientId, credentials.secret);
+                credentials = streamnr === undefined ? credentials.IN : credentials.OUT[streamnr];
+                this.auth = new Auth(config.authUrl, billingId, credentials.clientId, credentials.secret);
                 this.auth.authenticate().then( _ => {
+                    this.connect_ws();
                     resolve(this);
                 }).catch(error => reject(error))
             });
@@ -141,9 +156,7 @@ function WsReceiver(callback) {
     }
     this.connect_ws = function() {
         this.ws = new Websocket(`${this.egressUrl}/ws`, {
-            headers: {
-                Authorization: "Bearer "+ this.auth.getBearerHeaderValue()
-            }
+            headers: { Authorization: this.auth.getBearerHeaderValue() }
         })
         this.ws.on('open', () => {
             console.debug("websocket connected");
@@ -157,16 +170,18 @@ function WsReceiver(callback) {
             // the base64 is a consequence from the fact that our current Egress websocket implementation
             // cannot send binary packets. As a quick-and-dirty workaround, I've put in a base64 encoding.
             // TODO send bloody binaries.
+
             let buf = Buffer.from(message, 'base64')
             // these two lines are only valid for a Confluent type message wrapper.
-            let schemaId = buf.readUInt32BE(1);
-            let avroPayload = buf.slice(5)
+            // for other Avro message formats (like Single Object Encoding)
+            // https://avro.apache.org/docs/current/spec.html#single_object_encoding_spec
+            // this needs to be slightly different
+            let confluentSchemaId = buf.readUInt32BE(1);
+            let avroData = buf.slice(5)
 
-            this.getSchemaById(schemaId).then(schema => {
-                    let decoded = schema.fromBuffer(avroPayload);
-                    this.callback(decoded);
-                })
-
+            this.getSchemaById(confluentSchemaId)
+                .then(schema => this.callback(schema.fromBuffer(avroData)))
+                .catch(error=> console.error(error))
         })
     }
 
@@ -182,10 +197,10 @@ function WsReceiver(callback) {
                 axios.get(`${this.schemaUrl}/schemas/ids/${schemaId}`, {
                     headers: { "Authorization": this.auth.getBearerHeaderValue() }
                 }).then(result => {
-                    let type = avro.Type.forSchema(JSON.parse(result.data.schema));
                     console.log(`Retrieved schema for ${schemaId}`)
-                    resolve(type);
+                    resolve(avro.Type.forSchema(JSON.parse(result.data.schema)));
                 })
+                .catch(error=>reject(error))
             })
         }
         return this.schemaCache[schemaId];

@@ -1,6 +1,8 @@
 const streammachine = require('./streammachine')
 
 
+const SCHEMAID = "clickstream";
+
 /** create a dummy event.
  */
 function create_event() {
@@ -20,13 +22,15 @@ function create_event() {
     }
 }
 
-async function startup() {
-    new streammachine.Sender().init()
-        .then(client => {
-            setInterval(() => client.send_event(create_event()), 500);
-        })
+function dummy_sender(sender) {
+    setInterval(() => sender.send_event(create_event()), 500);
+}
+
+async function startup(config, handler, schemaId) {
+    new streammachine.Sender(config, schemaId).init()
+        .then(sender => handler(sender))
         .catch(error => console.error(error));
     await new Promise(r => setTimeout(r, 86400000));
 }
 
-startup();
+startup({}, dummy_sender, SCHEMAID);
