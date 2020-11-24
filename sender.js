@@ -33,4 +33,16 @@ async function startup(config, handler, schemaId) {
     await new Promise(r => setTimeout(r, 86400000));
 }
 
-startup({}, dummy_sender, SCHEMAID);
+let dev_config = {
+        gatewayUrl: "https://in.dev.strm.services/event",
+        authUrl: "https://auth.dev.strm.services",
+        egressUrl: "wss://out.dev.strm.services",
+        schemaUrl: "https://out.dev.strm.services",
+
+    credentialsFile: "credentials-dev.json"
+}
+
+let prod_config = {
+    credentialsFile: "credentials-prod.json"
+}
+startup(prod_config, dummy_sender, SCHEMAID);
