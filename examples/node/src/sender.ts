@@ -25,15 +25,15 @@ async function startSender() {
 
   try {
     await sender.connect();
+
+    await sender.send(EVENT);
+    await sender.send(EVENT);
+    await sender.send(EVENT);
+
+    sender.disconnect();
   } catch (error) {
     console.log("Connect failed", error);
   }
-
-  await sender.send(EVENT);
-  await sender.send(EVENT);
-  await sender.send(EVENT);
-
-  sender.disconnect();
 }
 
 const EVENT: ClientStreamEvent = {
