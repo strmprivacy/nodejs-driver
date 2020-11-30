@@ -17,7 +17,7 @@ export interface ReceiverConfig extends ClientConfig {
 }
 
 export class Receiver extends Client<ReceiverEvents> {
-  websocket: Websocket | undefined;
+  private websocket: Websocket | undefined;
   private readonly schemaUrl: string;
   private cache: {
     [key: string]: Type;
