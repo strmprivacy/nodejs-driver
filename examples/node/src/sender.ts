@@ -18,12 +18,16 @@ async function startSender() {
     schemaId: SCHEMA_ID,
     type: Type.forSchema(SCHEMA),
   });
-  
+
   sender.on("error", (error) => {
     console.log("Sender", error.message);
   });
 
-  await sender.connect();
+  try {
+    await sender.connect();
+  } catch (error) {
+    console.log("Connect failed", error);
+  }
 
   await sender.send(EVENT);
   await sender.send(EVENT);
@@ -47,4 +51,4 @@ const EVENT: ClientStreamEvent = {
   },
 };
 
-startSender().catch((error) => console.log("Something broke", error));
+startSender();
