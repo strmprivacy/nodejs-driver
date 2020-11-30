@@ -18,7 +18,7 @@ export interface ClientConfig {
   authUrl: string;
   billingId: string;
   clientId: string;
-  clientSecret: string;
+  secret: string;
   topic: string;
 }
 
@@ -115,7 +115,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
     const { data } = await this.axiosInstance.post<JwtToken>(`${this.config.authUrl}/auth`, {
       billingId: this.config.billingId,
       clientId: this.config.clientId,
-      clientSecret: this.config.clientSecret,
+      clientSecret: this.config.secret,
     });
     /**
      * Optional: Emit an event
