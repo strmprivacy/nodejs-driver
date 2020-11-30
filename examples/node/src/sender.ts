@@ -18,11 +18,7 @@ async function startSender() {
     schemaId: SCHEMA_ID,
     type: Type.forSchema(SCHEMA),
   });
-
-  sender.on("error", (error) => {
-    console.log("Sender", error.message);
-  });
-
+  
   sender.on("error", (error) => {
     console.log("Sender", error.message);
   });
