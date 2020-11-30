@@ -1,0 +1,221 @@
+import axios, { AxiosError, AxiosRequestConfig, CancelTokenSource } from "axios";
+import { EventEmitter } from "events";
+import TypedEmitter from "typed-emitter";
+
+/**
+ * Token definition
+ */
+export interface JwtToken {
+  idToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+/**
+ * Config containing values needed to authenticate with the server.
+ */
+export interface ClientConfig {
+  authUrl: string;
+  billingId: string;
+  clientId: string;
+  clientSecret: string;
+  topic: string;
+}
+
+/**
+ * Supported events and their handlers.
+ * @todo: Add/remove events based on requirements
+ */
+export interface ClientEvents {
+  error: (error: AxiosError | Error) => void;
+  disconnect: () => void;
+  authenticate: () => void;
+}
+
+/**
+ * TypeScript magic that overrides the untyped EventEmitter interface and uses a strongly typed one instead.
+ */
+export abstract class Client<T = ClientEvents> extends (EventEmitter as {
+  new <T>(): TypedEmitter<T & ClientEvents>;
+})<T> {
+  static readonly SEC_BEFORE_EXPIRATION = 60;
+
+  /**
+   * Separate instance of axios so it does not interfere with others.
+   */
+  protected axiosInstance = axios.create();
+
+  /**
+   * Token used for auth.
+   */
+  private token: JwtToken | undefined;
+
+  /**
+   * Reference to timeout.
+   */
+  private refreshTimeout: NodeJS.Timeout | undefined;
+
+  /**
+   * Token that can cancel Axios requests.
+   */
+  private requestToken: CancelTokenSource | undefined;
+
+  protected constructor(private config: ClientConfig, private apiUrls: string[] = []) {
+    super();
+    this.configureInterceptors();
+  }
+
+  /**
+   * This method opens an auth connection
+   */
+  async connect(): Promise<void> {
+    /**
+     * Create a token used to cancel open requests on disconnect.
+     */
+    this.requestToken = axios.CancelToken.source();
+
+    /**
+     * Authenticate if the token is missing or has expired.
+     */
+    if (this.token === undefined || this.createRefreshDelay() < 0) {
+      /**
+       * No try/catch -> caller of `connect` receives the error if auth fails.
+       */
+      this.token = await this.authenticate();
+    }
+
+    /**
+     * Start refreshing the token
+     */
+    await this.scheduleRefresh(this.token);
+  }
+
+  disconnect(): void {
+    /**
+     * Cancel open requests
+     */
+    if (this.requestToken) {
+      this.requestToken.cancel();
+    }
+
+    /**
+     * Clear refresh timeout
+     */
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+    }
+
+    /**
+     * Emit an event
+     */
+    this.emit("disconnect");
+  }
+
+  private async authenticate(): Promise<JwtToken> {
+    const { data } = await this.axiosInstance.post<JwtToken>(
+      `${this.config.authUrl}/auth`,
+      this.config
+    );
+    /**
+     * Optional: Emit an event
+     */
+    this.emit("authenticate");
+    return data;
+  }
+
+  /**
+   * Method that keeps the auth session alive.
+   */
+  private scheduleRefresh(token: JwtToken): void {
+    const delay = this.createRefreshDelay();
+
+    if (delay < 0) {
+      this.emit("error", new Error("Token expired"));
+      this.disconnect();
+      return;
+    }
+    /**
+     * Keep a reference to the active timeout so it can be cancelled on disconnect.
+     */
+    this.refreshTimeout = setTimeout(async () => {
+      /**
+       * The user of this client is not able to receive errors from this async logic so errors are caught and emitted
+       * as events. Currently a refresh error will result in a disconnect.
+       * @todo: Retry n times functionality?
+       */
+      try {
+        this.token = await this.refresh(token);
+        this.scheduleRefresh(this.token);
+      } catch (error) {
+        /**
+         * Cancelled requests are not emitted as errors
+         */
+        if (!axios.isCancel(error)) {
+          this.emit("error", error);
+          this.disconnect();
+        }
+      }
+    }, delay);
+  }
+
+  /**
+   * Returns the header used for auth.
+   */
+  protected getBearerHeader(): Record<"Authorization", string> | {} {
+    return this.token ? { Authorization: `Bearer ${this.token.idToken}` } : {};
+  }
+
+  /**
+   * Refreshes the token.
+   */
+  private async refresh(oldToken: JwtToken): Promise<JwtToken> {
+    const { data } = await this.axiosInstance.post<JwtToken>(
+      `${this.config.authUrl}/refresh`,
+      oldToken
+    );
+    return data;
+  }
+
+  /**
+   * Returns the amount of ms until n seconds before the token expires.
+   */
+  private createRefreshDelay(): number {
+    if (this.token === undefined) {
+      return -1;
+    }
+    const timeUntilExpirationInSec = this.token.expiresAt - new Date().getTime() / 1000;
+    return (timeUntilExpirationInSec - Client.SEC_BEFORE_EXPIRATION) * 1000;
+  }
+
+  /**
+   * The client's axios instance will intercept requests and conditionally enrich request configs.
+   */
+  private configureInterceptors(): void {
+    this.axiosInstance.interceptors.request.use(this.addTokenToApiRequest.bind(this));
+    this.axiosInstance.interceptors.request.use(this.addCancelTokenToRequest.bind(this));
+  }
+
+  /**
+   * Adds the Authorization header to API endpoint(s) requests.
+   */
+  private addTokenToApiRequest(request: AxiosRequestConfig): AxiosRequestConfig {
+    if (
+      this.token !== undefined &&
+      this.apiUrls.some((apiUrl) => request.url && request.url.startsWith(apiUrl))
+    ) {
+      request.headers = {
+        ...request.headers,
+        ...this.getBearerHeader(),
+      };
+    }
+    return request;
+  }
+
+  /**
+   * Adds the Axios cancel token to each request.
+   */
+  private addCancelTokenToRequest(request: AxiosRequestConfig): AxiosRequestConfig {
+    request.cancelToken = this.requestToken ? this.requestToken.token : undefined;
+    return request;
+  }
+}
