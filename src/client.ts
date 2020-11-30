@@ -112,10 +112,11 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   }
 
   private async authenticate(): Promise<JwtToken> {
-    const { data } = await this.axiosInstance.post<JwtToken>(
-      `${this.config.authUrl}/auth`,
-      this.config
-    );
+    const { data } = await this.axiosInstance.post<JwtToken>(`${this.config.authUrl}/auth`, {
+      billingId: this.config.billingId,
+      clientId: this.config.clientId,
+      clientSecret: this.config.clientSecret,
+    });
     /**
      * Optional: Emit an event
      */
