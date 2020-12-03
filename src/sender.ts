@@ -34,7 +34,7 @@ export class Sender extends Client {
   /**
    * Sends an event
    */
-  async send(event: ClientStreamEvent): Promise<AxiosResponse> {
+  async send<T extends ClientStreamEvent>(event: T): Promise<AxiosResponse> {
     /**
      * Merges ClientStreamEvent with missing fields of ApiStreamEvent to create an ApiStreamEvent
      */

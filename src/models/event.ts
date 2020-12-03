@@ -1,15 +1,7 @@
 /**
  * Stream event type.
  */
-interface GenericStreamEvent<MetaData> {
-  abTests: string[];
-  eventType: string;
-  customer: { id: string };
-  referrer: string;
-  userAgent: string;
-  producerSessionId: string;
-  conversion: number;
-  url: string;
+interface StreamEvent<MetaData> {
   strmMeta: MetaData;
 }
 
@@ -26,9 +18,9 @@ interface StreamEventMetaData {
 /**
  * Type that represents the full event.
  */
-export type ApiStreamEvent = GenericStreamEvent<StreamEventMetaData>;
+export type ApiStreamEvent = StreamEvent<StreamEventMetaData>;
 
 /**
  * Type for event creation (event without values automatically assigned by the client).
  */
-export type ClientStreamEvent = GenericStreamEvent<Pick<StreamEventMetaData, "consentLevels">>;
+export type ClientStreamEvent = StreamEvent<Pick<StreamEventMetaData, "consentLevels">>;

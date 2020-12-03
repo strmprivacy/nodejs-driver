@@ -36,7 +36,18 @@ async function startSender() {
   }
 }
 
-const EVENT: ClientStreamEvent = {
+interface MyStreamEvent extends ClientStreamEvent {
+  abTests: string[];
+  eventType: string;
+  customer: { id: string };
+  referrer: string;
+  userAgent: string;
+  producerSessionId: string;
+  conversion: number;
+  url: string;
+}
+
+const EVENT: MyStreamEvent = {
   abTests: ["abc"],
   eventType: "button x clicked",
   customer: { id: "customer-id" },
