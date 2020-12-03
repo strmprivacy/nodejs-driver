@@ -5,3 +5,7 @@ schema-cache
 examples
 *.js
 !dist/*.js
+*.spec.ts
+*.spec.d.ts
+jest.config.json
+*.tgz

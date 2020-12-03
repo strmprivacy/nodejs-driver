@@ -22,6 +22,10 @@ export interface ClientConfig {
   topic: string;
 }
 
+export enum HTTP_STATUS_CODE {
+  UNAUTHORIZED = 401,
+}
+
 /**
  * Supported events and their handlers.
  * @todo: Add/remove events based on requirements
@@ -39,6 +43,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   new <T>(): TypedEmitter<T & ClientEvents>;
 })<T> {
   static readonly SEC_BEFORE_EXPIRATION = 60;
+  static readonly FAILED_REQUEST_RETRY_ATTEMPTS = 3;
 
   /**
    * Separate instance of axios so it does not interfere with others.
@@ -77,11 +82,15 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
     /**
      * Authenticate if the token is missing or has expired.
      */
-    if (this.token === undefined || this.createRefreshDelay() < 0) {
+    if (this.token === undefined || this.getMsBeforeNextRefresh() < 0) {
       /**
        * No try/catch -> caller of `connect` receives the error if auth fails.
        */
       this.token = await this.authenticate();
+
+      if (this.getMsBeforeNextRefresh() < 0) {
+        throw new Error("Token expired");
+      }
     }
 
     /**
@@ -127,36 +136,40 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   /**
    * Method that keeps the auth session alive.
    */
-  private scheduleRefresh(token: JwtToken): void {
-    const delay = this.createRefreshDelay();
-
-    if (delay < 0) {
-      this.emit("error", new Error("Token expired"));
-      this.disconnect();
-      return;
-    }
+  private scheduleRefresh(token: JwtToken, retryAttempt = 0): void {
     /**
      * Keep a reference to the active timeout so it can be cancelled on disconnect.
      */
-    this.refreshTimeout = setTimeout(async () => {
-      /**
-       * The user of this client is not able to receive errors from this async logic so errors are caught and emitted
-       * as events. Currently a refresh error will result in a disconnect.
-       * @todo: Retry n times functionality?
-       */
-      try {
-        this.token = await this.refresh(token);
-        this.scheduleRefresh(this.token);
-      } catch (error) {
+    this.refreshTimeout = setTimeout(
+      async () => {
         /**
-         * Cancelled requests are not emitted as errors
+         * The user of this client is not able to receive errors from this async logic so errors are caught and emitted
+         * as events. Currently a refresh error will result in a disconnect.
+         * @todo: Retry n times functionality?
          */
-        if (!axios.isCancel(error)) {
-          this.emit("error", error);
-          this.disconnect();
+        try {
+          this.token = await this.refresh(token);
+          this.scheduleRefresh(this.token);
+        } catch (error) {
+          /**
+           * Cancelled requests are not emitted as errors
+           */
+          if (!axios.isCancel(error)) {
+            const statusCode = (error as AxiosError).response?.status;
+            if (
+              statusCode !== HTTP_STATUS_CODE.UNAUTHORIZED &&
+              retryAttempt < Client.FAILED_REQUEST_RETRY_ATTEMPTS
+            ) {
+              await this.scheduleRefresh(token, ++retryAttempt);
+            } else {
+              this.emit("error", error);
+              this.disconnect();
+            }
+          }
         }
-      }
-    }, delay);
+      },
+      retryAttempt === 0 ? this.getMsBeforeNextRefresh() : 0
+    );
   }
 
   /**
@@ -180,7 +193,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   /**
    * Returns the amount of ms until n seconds before the token expires.
    */
-  private createRefreshDelay(): number {
+  private getMsBeforeNextRefresh(): number {
     if (this.token === undefined) {
       return -1;
     }
