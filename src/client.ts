@@ -153,20 +153,22 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
           /**
            * Cancelled requests are not emitted as errors
            */
-          if (!axios.isCancel(error)) {
-            const statusCode = (error as AxiosError).response?.status;
-            /**
-             * Retry mechanism
-             */
-            if (
-              statusCode !== HTTP_STATUS_CODE.UNAUTHORIZED &&
-              retryAttempt < Client.FAILED_REQUEST_RETRY_ATTEMPTS
-            ) {
-              await this.scheduleRefresh(token, ++retryAttempt);
-            } else {
-              this.emit("error", error);
-              this.disconnect();
-            }
+          if (axios.isCancel(error)) {
+            return;
+          }
+
+          const statusCode = (error as AxiosError).response?.status;
+          /**
+           * Retry mechanism
+           */
+          if (
+            statusCode !== HTTP_STATUS_CODE.UNAUTHORIZED &&
+            retryAttempt < Client.FAILED_REQUEST_RETRY_ATTEMPTS
+          ) {
+            await this.scheduleRefresh(token, ++retryAttempt);
+          } else {
+            this.emit("error", error);
+            this.disconnect();
           }
         }
       },
