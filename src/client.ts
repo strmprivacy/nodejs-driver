@@ -144,8 +144,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
       async () => {
         /**
          * The user of this client is not able to receive errors from this async logic so errors are caught and emitted
-         * as events. Currently a refresh error will result in a disconnect.
-         * @todo: Retry n times functionality?
+         * as events.
          */
         try {
           this.token = await this.refresh(token);
@@ -156,6 +155,9 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
            */
           if (!axios.isCancel(error)) {
             const statusCode = (error as AxiosError).response?.status;
+            /**
+             * Retry mechanism
+             */
             if (
               statusCode !== HTTP_STATUS_CODE.UNAUTHORIZED &&
               retryAttempt < Client.FAILED_REQUEST_RETRY_ATTEMPTS
