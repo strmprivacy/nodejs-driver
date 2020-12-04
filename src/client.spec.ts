@@ -18,6 +18,8 @@ describe("Client", () => {
     topic: "topic",
   };
 
+  const API_URL = "api";
+
   const NOW_IN_MS = new Date("Tue Dec 02 2020 22:09:40 GMT+0100").getTime();
 
   const MOCK_TOKEN: JwtToken = {
@@ -54,7 +56,7 @@ describe("Client", () => {
       })
     );
 
-    client = new TestClient(MOCK_CONFIG);
+    client = new TestClient(MOCK_CONFIG, [API_URL]);
   });
 
   afterEach(() => {
@@ -70,7 +72,7 @@ describe("Client", () => {
     return Promise.resolve();
   };
 
-  describe("Auth", () => {
+  describe("Connect", () => {
     it("should send an auth request on connect", async () => {
       await client.connect();
 
@@ -211,6 +213,59 @@ describe("Client", () => {
 
       expect(axiosInstance.post).not.toHaveBeenCalled();
       expect(jest.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe("Disconnect", () => {
+    beforeEach(async () => {
+      await client.connect();
+    });
+
+    it("should clear scheduled refresh", () => {
+      expect(jest.getTimerCount()).toBe(1);
+      client.disconnect();
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it("should cancel pending requests", () => {
+      spyOn(client["requestToken"]!, "cancel");
+      client.disconnect();
+      expect(client["requestToken"]!.cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("should emit disconnect event", () => {
+      const spy = jest.fn();
+      client.on("disconnect", spy);
+      client.disconnect();
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("Interceptors", () => {
+    it("should add cancel token to each request", () => {
+      expect(client["addCancelTokenToRequest"]({})).toEqual({
+        cancelToken: client["requestToken"]?.token,
+      });
+    });
+
+    it("should add token as a header to each api request", async () => {
+      await client.connect();
+
+      expect(client["addTokenToApiRequest"]({ url: API_URL, headers: {} })).toEqual({
+        url: API_URL,
+        headers: {
+          Authorization: `Bearer ${MOCK_TOKEN.idToken}`,
+        },
+      });
+    });
+
+    it("should not add token as a header if the url is not an api url", async () => {
+      await client.connect();
+
+      expect(client["addTokenToApiRequest"]({ url: "notApi", headers: {} })).toEqual({
+        url: "notApi",
+        headers: {},
+      });
     });
   });
 });
