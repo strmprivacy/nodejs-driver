@@ -1,2 +1,6 @@
+.idea
 credentials*.json
 schema-cache/
+dist
+node_modules
+*.tgz
