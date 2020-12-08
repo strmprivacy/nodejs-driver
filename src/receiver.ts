@@ -41,7 +41,7 @@ export class Receiver extends Client<ReceiverEvents> {
      * dealing with websockets then we'll have to manually refresh (disconnect -> connect) this socket with a new
      * Bearer header everytime the token changes.
      */
-    this.websocket = new Websocket(`${this.schemaUrl}/ws`, {
+    this.websocket = new Websocket(`${this.schemaUrl}/ws?asJson=true`, {
       headers: { ...this.getBearerHeader() },
     });
 
@@ -62,15 +62,7 @@ export class Receiver extends Client<ReceiverEvents> {
      */
     this.websocket.on("message", async (message: string) => {
       try {
-        /**
-         * @todo: Check requirements to see what to do here
-         */
-        const buf = Buffer.from(message, "base64");
-        const confluentSchemaId = buf.readUInt32BE(1);
-        const avroData = buf.slice(5);
-        const type = await this.getSchemaById(confluentSchemaId);
-        const event: ApiStreamEvent = type.fromBuffer(avroData);
-        this.emit("event", event);
+        this.emit("event", JSON.parse(message));
       } catch (error) {
         this.emit("error", error);
       }

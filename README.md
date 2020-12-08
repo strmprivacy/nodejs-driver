@@ -23,7 +23,7 @@ npm run prod
 Currently nothing is published yet, so for now additional steps are needed to run the example:
 
 ```bash
-npm run build
+npm build
 npm pack
 
 cd examples/node

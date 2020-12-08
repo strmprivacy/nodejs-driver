@@ -214,6 +214,29 @@ describe("Client", () => {
       expect(axiosInstance.post).not.toHaveBeenCalled();
       expect(jest.getTimerCount()).toBe(0);
     });
+
+    it("should not retry if the server responds with bad request", async () => {
+      client.on("error", () => {});
+
+      await client.connect();
+
+      axiosInstance.post!.mockReturnValue(
+        Promise.reject({
+          response: {
+            status: HTTP_STATUS_CODE.BAD_REQUEST,
+          },
+        })
+      );
+
+      await flushFirstRefreshAttempt();
+
+      axiosInstance.post!.mockReset();
+
+      await flushRetryAttempts();
+
+      expect(axiosInstance.post).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+    });
   });
 
   describe("Disconnect", () => {

@@ -18,7 +18,9 @@ interface StreamEventMetaData {
 /**
  * Type that represents the full event.
  */
-export type ApiStreamEvent = StreamEvent<StreamEventMetaData>;
+export interface ApiStreamEvent extends StreamEvent<StreamEventMetaData> {
+  [key: string]: any;
+}
 
 /**
  * Type for event creation (event without values automatically assigned by the client).

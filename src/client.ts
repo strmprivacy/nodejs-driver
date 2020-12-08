@@ -24,6 +24,7 @@ export interface ClientConfig {
 
 export enum HTTP_STATUS_CODE {
   UNAUTHORIZED = 401,
+  BAD_REQUEST = 400,
 }
 
 /**
@@ -163,6 +164,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
            */
           if (
             statusCode !== HTTP_STATUS_CODE.UNAUTHORIZED &&
+            statusCode !== HTTP_STATUS_CODE.BAD_REQUEST &&
             retryAttempt < Client.FAILED_REQUEST_RETRY_ATTEMPTS
           ) {
             await this.scheduleRefresh(token, ++retryAttempt);

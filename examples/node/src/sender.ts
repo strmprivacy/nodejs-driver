@@ -19,6 +19,7 @@ async function startSender() {
     type: Type.forSchema(SCHEMA),
   });
 
+  // Make sure to listen for error events, otherwise Node does not handle the error events (they're escalated)
   sender.on("error", (error) => {
     console.log("Sender", error.message);
   });
