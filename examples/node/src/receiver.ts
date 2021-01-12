@@ -14,7 +14,7 @@ async function startReceiver() {
     });
 
     receiver.on("event", (event) => {
-        console.log("Receiver", `Event received: ${event.abTests}`);
+        console.log("Receiver", `Event received: ${event}`);
     });
 
     receiver.on("error", (error) => {
