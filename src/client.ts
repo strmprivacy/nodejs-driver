@@ -1,6 +1,8 @@
 import axios, { AxiosError, AxiosRequestConfig, CancelTokenSource } from "axios";
 import { EventEmitter } from "events";
 import TypedEmitter from "typed-emitter";
+import * as http from "http";
+import * as https from "https";
 
 /**
  * Token definition
@@ -49,7 +51,14 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   /**
    * Separate instance of axios so it does not interfere with others.
    */
-  protected axiosInstance = axios.create();
+  protected axiosInstance = axios.create({
+    timeout: 5000,
+
+    //keepAlive pools and reuses TCP connections, so it's faster
+    httpAgent: new http.Agent({ keepAlive: true }),
+    httpsAgent: new https.Agent({ keepAlive: true }),
+
+  });
 
   /**
    * Token used for auth.

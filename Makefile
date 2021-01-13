@@ -1,4 +1,4 @@
 publish-to-npmjs:
-	npm prod && \
+	npm run prod && \
 	npm pack && \
 	npm publish --access public
