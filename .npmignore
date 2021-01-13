@@ -3,6 +3,7 @@ src
 assets
 schema-cache
 examples
+*.iml
 *.js
 !dist/*.js
 *.spec.ts
