@@ -5,8 +5,8 @@ type Mock<T> = Partial<Record<keyof T, jest.SpyInstance>>;
 
 describe("Client", () => {
   class TestClient extends Client {
-    constructor(config: ClientConfig, apiUrls: string[] = []) {
-      super(config, apiUrls);
+    constructor(config: ClientConfig) {
+      super(config);
     }
   }
 
@@ -17,8 +17,6 @@ describe("Client", () => {
     authUrl: "authUrl",
     topic: "topic",
   };
-
-  const API_URL = "api";
 
   const NOW_IN_MS = new Date("Tue Dec 02 2020 22:09:40 GMT+0100").getTime();
 
@@ -56,7 +54,7 @@ describe("Client", () => {
       })
     );
 
-    client = new TestClient(MOCK_CONFIG, [API_URL]);
+    client = new TestClient(MOCK_CONFIG);
   });
 
   afterEach(() => {
@@ -261,34 +259,6 @@ describe("Client", () => {
       client.on("disconnect", spy);
       client.disconnect();
       expect(spy).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("Interceptors", () => {
-    it("should add cancel token to each request", () => {
-      expect(client["addCancelTokenToRequest"]({})).toEqual({
-        cancelToken: client["requestToken"]?.token,
-      });
-    });
-
-    it("should add token as a header to each api request", async () => {
-      await client.connect();
-
-      expect(client["addTokenToApiRequest"]({ url: API_URL, headers: {} })).toEqual({
-        url: API_URL,
-        headers: {
-          Authorization: `Bearer ${MOCK_TOKEN.idToken}`,
-        },
-      });
-    });
-
-    it("should not add token as a header if the url is not an api url", async () => {
-      await client.connect();
-
-      expect(client["addTokenToApiRequest"]({ url: "notApi", headers: {} })).toEqual({
-        url: "notApi",
-        headers: {},
-      });
     });
   });
 });

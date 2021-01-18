@@ -75,9 +75,8 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    */
   private requestToken: CancelTokenSource | undefined;
 
-  protected constructor(private config: ClientConfig, private apiUrls: string[] = []) {
+  protected constructor(private config: ClientConfig) {
     super();
-    this.configureInterceptors();
   }
 
   /**
@@ -214,37 +213,5 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
     }
     const timeUntilExpirationInSec = this.token.expiresAt - new Date().getTime() / 1000;
     return (timeUntilExpirationInSec - Client.SEC_BEFORE_EXPIRATION) * 1000;
-  }
-
-  /**
-   * The client's axios instance will intercept requests and conditionally enrich request configs.
-   */
-  private configureInterceptors(): void {
-    this.axiosInstance.interceptors.request.use(this.addTokenToApiRequest.bind(this));
-    this.axiosInstance.interceptors.request.use(this.addCancelTokenToRequest.bind(this));
-  }
-
-  /**
-   * Adds the Authorization header to API endpoint(s) requests.
-   */
-  private addTokenToApiRequest(request: AxiosRequestConfig): AxiosRequestConfig {
-    if (
-      this.token !== undefined &&
-      this.apiUrls.some((apiUrl) => request.url && request.url.startsWith(apiUrl))
-    ) {
-      request.headers = {
-        ...request.headers,
-        ...this.getBearerHeader(),
-      };
-    }
-    return request;
-  }
-
-  /**
-   * Adds the Axios cancel token to each request.
-   */
-  private addCancelTokenToRequest(request: AxiosRequestConfig): AxiosRequestConfig {
-    request.cancelToken = this.requestToken ? this.requestToken.token : undefined;
-    return request;
   }
 }

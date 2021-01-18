@@ -25,7 +25,7 @@ export class Sender extends Client {
     /**
      * Passes ClientConfig and urls that require authentication to the base class.
      */
-    super(config, [config.apiUrl]);
+    super(config);
     this.apiUrl = config.apiUrl;
     this.schemaId = config.schemaId;
     this.type = config.type;
@@ -56,6 +56,7 @@ export class Sender extends Client {
         "Content-Type": "application/octet-stream",
         "Strm-Serialization-Type": "application/x-avro-binary",
         "Strm-Schema-Id": this.schemaId,
+        ...this.getBearerHeader(),
       },
     });
     /**

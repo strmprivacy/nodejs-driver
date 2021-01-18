@@ -2,7 +2,6 @@ import { Type } from "avsc";
 import { Client, ClientConfig, ClientEvents } from "./client";
 import * as Websocket from "ws";
 import { ApiStreamEvent } from "./models/event";
-import { Buffer } from "buffer";
 
 /**
  * Supported events and their handlers.
@@ -24,7 +23,7 @@ export class Receiver extends Client<ReceiverEvents> {
   } = {};
 
   constructor(config: ReceiverConfig) {
-    super(config, [config.schemaUrl]);
+    super(config);
     this.schemaUrl = config.schemaUrl;
   }
 
