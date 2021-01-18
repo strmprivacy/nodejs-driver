@@ -248,12 +248,6 @@ describe("Client", () => {
       expect(jest.getTimerCount()).toBe(0);
     });
 
-    it("should cancel pending requests", () => {
-      spyOn(client["requestToken"]!, "cancel");
-      client.disconnect();
-      expect(client["requestToken"]!.cancel).toHaveBeenCalledTimes(1);
-    });
-
     it("should emit disconnect event", () => {
       const spy = jest.fn();
       client.on("disconnect", spy);
