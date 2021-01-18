@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosRequestConfig, CancelTokenSource } from "axios";
+import axios, { AxiosError } from "axios";
 import { EventEmitter } from "events";
 import TypedEmitter from "typed-emitter";
 import * as http from "http";
@@ -70,11 +70,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    */
   private refreshTimeout: NodeJS.Timeout | undefined;
 
-  /**
-   * Token that can cancel Axios requests.
-   */
-  private requestToken: CancelTokenSource | undefined;
-
   protected constructor(private config: ClientConfig) {
     super();
   }
@@ -83,11 +78,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    * This method opens an auth connection
    */
   async connect(): Promise<void> {
-    /**
-     * Create a token used to cancel open requests on disconnect.
-     */
-    this.requestToken = axios.CancelToken.source();
-
     /**
      * Authenticate if the token is missing or has expired.
      */
@@ -109,13 +99,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   }
 
   disconnect(): void {
-    /**
-     * Cancel open requests
-     */
-    if (this.requestToken) {
-      this.requestToken.cancel();
-    }
-
     /**
      * Clear refresh timeout
      */
@@ -159,13 +142,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
           this.token = await this.refresh(token);
           this.scheduleRefresh(this.token);
         } catch (error) {
-          /**
-           * Cancelled requests are not emitted as errors
-           */
-          if (axios.isCancel(error)) {
-            return;
-          }
-
           const statusCode = (error as AxiosError).response?.status;
           /**
            * Retry mechanism
