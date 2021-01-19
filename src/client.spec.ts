@@ -48,11 +48,9 @@ describe("Client", () => {
 
     jest.spyOn(axios, "create").mockReturnValue(axiosInstance as any);
 
-    axiosInstance.post!.mockReturnValue(
-      Promise.resolve({
-        data: MOCK_TOKEN,
-      })
-    );
+    axiosInstance.post!.mockResolvedValue({
+      data: MOCK_TOKEN,
+    });
 
     client = new TestClient(MOCK_CONFIG);
   });
@@ -89,19 +87,17 @@ describe("Client", () => {
 
     it("should throw if auth fails on connect", async () => {
       const ERROR = new Error();
-      axiosInstance.post!.mockReturnValue(Promise.reject(ERROR));
+      axiosInstance.post!.mockRejectedValue(ERROR);
       await expect(client.connect()).rejects.toEqual(ERROR);
     });
 
     it("should throw if the token is expired", async () => {
-      axiosInstance.post!.mockReturnValue(
-        Promise.resolve({
-          data: {
-            ...MOCK_TOKEN,
-            expiresAt: NOW_IN_MS / 1000,
-          },
-        })
-      );
+      axiosInstance.post!.mockResolvedValue({
+        data: {
+          ...MOCK_TOKEN,
+          expiresAt: NOW_IN_MS / 1000,
+        },
+      });
 
       await expect(client.connect()).rejects.toEqual(new Error("Token expired"));
     });
@@ -112,12 +108,14 @@ describe("Client", () => {
       TIME_BEFORE_TOKEN_EXPIRES - Client.SEC_BEFORE_EXPIRATION * 1000;
 
     async function flushFirstRefreshAttempt() {
-      await tick(TIME_BEFORE_REFRESH_ATTEMPT);
+      await tick(TIME_BEFORE_REFRESH_ATTEMPT); // Trigger call (timeout)
+      await tick(0); // Trigger resolve/reject
     }
 
     async function flushRetryAttempts() {
       for (let i = 0; i < Client.FAILED_REQUEST_RETRY_ATTEMPTS; i++) {
-        await tick(0);
+        await tick(0); // Trigger call (timeout)
+        await tick(0); // Trigger resolve/reject
       }
     }
 
@@ -129,7 +127,7 @@ describe("Client", () => {
     it(`should refresh the token ${Client.SEC_BEFORE_EXPIRATION}sec before it expires`, async () => {
       await client.connect();
 
-      axiosInstance.post!.mockReset();
+      axiosInstance.post!.mockClear();
 
       await tick(TIME_BEFORE_REFRESH_ATTEMPT - 1);
 
@@ -141,12 +139,13 @@ describe("Client", () => {
     });
 
     it(`should retry ${Client.FAILED_REQUEST_RETRY_ATTEMPTS} times if refresh keeps failing`, async () => {
+      client.on("error", () => {});
       await client.connect();
 
-      axiosInstance.post!.mockReturnValue(Promise.reject(new Error()));
+      axiosInstance.post!.mockRejectedValue(new Error());
 
       await flushFirstRefreshAttempt();
-      axiosInstance.post!.mockReset();
+      axiosInstance.post!.mockClear();
 
       await flushRetryAttempts();
 
@@ -162,7 +161,7 @@ describe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockReturnValue(Promise.reject(ERROR));
+      axiosInstance.post!.mockRejectedValue(ERROR);
 
       await flushAllRefreshAttempts();
 
@@ -182,7 +181,7 @@ describe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockReturnValue(Promise.reject(ERROR));
+      axiosInstance.post!.mockRejectedValue(ERROR);
 
       await flushAllRefreshAttempts();
 
@@ -195,17 +194,15 @@ describe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockReturnValue(
-        Promise.reject({
-          response: {
-            status: HTTP_STATUS_CODE.UNAUTHORIZED,
-          },
-        })
-      );
+      axiosInstance.post!.mockRejectedValue({
+        response: {
+          status: HTTP_STATUS_CODE.UNAUTHORIZED,
+        },
+      });
 
       await flushFirstRefreshAttempt();
 
-      axiosInstance.post!.mockReset();
+      axiosInstance.post!.mockClear();
 
       await flushRetryAttempts();
 
@@ -218,17 +215,15 @@ describe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockReturnValue(
-        Promise.reject({
-          response: {
-            status: HTTP_STATUS_CODE.BAD_REQUEST,
-          },
-        })
-      );
+      axiosInstance.post!.mockRejectedValue({
+        response: {
+          status: HTTP_STATUS_CODE.BAD_REQUEST,
+        },
+      });
 
       await flushFirstRefreshAttempt();
 
-      axiosInstance.post!.mockReset();
+      axiosInstance.post!.mockClear();
 
       await flushRetryAttempts();
 
