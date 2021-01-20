@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosRequestConfig, CancelTokenSource } from "axios";
+import axios, { AxiosError } from "axios";
 import { EventEmitter } from "events";
 import TypedEmitter from "typed-emitter";
 import * as http from "http";
@@ -70,25 +70,14 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    */
   private refreshTimeout: NodeJS.Timeout | undefined;
 
-  /**
-   * Token that can cancel Axios requests.
-   */
-  private requestToken: CancelTokenSource | undefined;
-
-  protected constructor(private config: ClientConfig, private apiUrls: string[] = []) {
+  protected constructor(private config: ClientConfig) {
     super();
-    this.configureInterceptors();
   }
 
   /**
    * This method opens an auth connection
    */
   async connect(): Promise<void> {
-    /**
-     * Create a token used to cancel open requests on disconnect.
-     */
-    this.requestToken = axios.CancelToken.source();
-
     /**
      * Authenticate if the token is missing or has expired.
      */
@@ -110,13 +99,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   }
 
   disconnect(): void {
-    /**
-     * Cancel open requests
-     */
-    if (this.requestToken) {
-      this.requestToken.cancel();
-    }
-
     /**
      * Clear refresh timeout
      */
@@ -160,13 +142,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
           this.token = await this.refresh(token);
           this.scheduleRefresh(this.token);
         } catch (error) {
-          /**
-           * Cancelled requests are not emitted as errors
-           */
-          if (axios.isCancel(error)) {
-            return;
-          }
-
           const statusCode = (error as AxiosError).response?.status;
           /**
            * Retry mechanism
@@ -214,37 +189,5 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
     }
     const timeUntilExpirationInSec = this.token.expiresAt - new Date().getTime() / 1000;
     return (timeUntilExpirationInSec - Client.SEC_BEFORE_EXPIRATION) * 1000;
-  }
-
-  /**
-   * The client's axios instance will intercept requests and conditionally enrich request configs.
-   */
-  private configureInterceptors(): void {
-    this.axiosInstance.interceptors.request.use(this.addTokenToApiRequest.bind(this));
-    this.axiosInstance.interceptors.request.use(this.addCancelTokenToRequest.bind(this));
-  }
-
-  /**
-   * Adds the Authorization header to API endpoint(s) requests.
-   */
-  private addTokenToApiRequest(request: AxiosRequestConfig): AxiosRequestConfig {
-    if (
-      this.token !== undefined &&
-      this.apiUrls.some((apiUrl) => request.url && request.url.startsWith(apiUrl))
-    ) {
-      request.headers = {
-        ...request.headers,
-        ...this.getBearerHeader(),
-      };
-    }
-    return request;
-  }
-
-  /**
-   * Adds the Axios cancel token to each request.
-   */
-  private addCancelTokenToRequest(request: AxiosRequestConfig): AxiosRequestConfig {
-    request.cancelToken = this.requestToken ? this.requestToken.token : undefined;
-    return request;
   }
 }
