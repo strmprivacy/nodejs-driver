@@ -17,11 +17,10 @@ export interface JwtToken {
  * Config containing values needed to authenticate with the server.
  */
 export interface ClientConfig {
-  authUrl: string;
+  stsUrl: string;
   billingId: string;
   clientId: string;
-  secret: string;
-  topic: string;
+  clientSecret: string;
 }
 
 export enum HTTP_STATUS_CODE {
@@ -113,10 +112,10 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   }
 
   private async authenticate(): Promise<JwtToken> {
-    const { data } = await this.axiosInstance.post<JwtToken>(`${this.config.authUrl}/auth`, {
+    const { data } = await this.axiosInstance.post<JwtToken>(`${this.config.stsUrl}/auth`, {
       billingId: this.config.billingId,
       clientId: this.config.clientId,
-      clientSecret: this.config.secret,
+      clientSecret: this.config.clientSecret,
     });
     /**
      * Optional: Emit an event
@@ -174,7 +173,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    */
   private async refresh(oldToken: JwtToken): Promise<JwtToken> {
     const { data } = await this.axiosInstance.post<JwtToken>(
-      `${this.config.authUrl}/refresh`,
+      `${this.config.stsUrl}/refresh`,
       oldToken
     );
     return data;

@@ -11,11 +11,10 @@ describe("Client", () => {
   }
 
   const MOCK_CONFIG: ClientConfig = {
-    secret: "secret",
+    clientSecret: "secret",
     clientId: "clientId",
     billingId: "billingId",
-    authUrl: "authUrl",
-    topic: "topic",
+    stsUrl: "authUrl",
   };
 
   const NOW_IN_MS = new Date("Tue Dec 02 2020 22:09:40 GMT+0100").getTime();
@@ -73,10 +72,10 @@ describe("Client", () => {
       await client.connect();
 
       expect(axiosInstance.post).toHaveBeenCalledTimes(1);
-      expect(axiosInstance.post).toHaveBeenCalledWith(MOCK_CONFIG.authUrl + "/auth", {
+      expect(axiosInstance.post).toHaveBeenCalledWith(MOCK_CONFIG.stsUrl + "/auth", {
         billingId: MOCK_CONFIG.billingId,
         clientId: MOCK_CONFIG.clientId,
-        clientSecret: MOCK_CONFIG.secret,
+        clientSecret: MOCK_CONFIG.clientSecret,
       });
     });
 
@@ -135,7 +134,7 @@ describe("Client", () => {
 
       await tick(1);
 
-      expect(axiosInstance.post).toHaveBeenCalledWith(MOCK_CONFIG.authUrl + "/refresh", MOCK_TOKEN);
+      expect(axiosInstance.post).toHaveBeenCalledWith(MOCK_CONFIG.stsUrl + "/refresh", MOCK_TOKEN);
     });
 
     it(`should retry ${Client.FAILED_REQUEST_RETRY_ATTEMPTS} times if refresh keeps failing`, async () => {

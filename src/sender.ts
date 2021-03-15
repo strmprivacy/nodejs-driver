@@ -8,7 +8,7 @@ import { ApiStreamEvent, ClientStreamEvent } from "./models/event";
  * @todo: Add/remove events based on requirements
  */
 export interface SenderConfig extends ClientConfig {
-  apiUrl: string;
+  gatewayUrl: string;
   schemaId: string;
   type: Type;
 }
@@ -17,7 +17,7 @@ export interface SenderConfig extends ClientConfig {
  * Note that Sender has not added any supported events to the client (yet)
  */
 export class Sender extends Client {
-  private readonly apiUrl: string;
+  private readonly gatewayUrl: string;
   private readonly schemaId: string;
   private readonly type: Type;
 
@@ -26,7 +26,7 @@ export class Sender extends Client {
      * Passes ClientConfig and urls that require authentication to the base class.
      */
     super(config);
-    this.apiUrl = config.apiUrl;
+    this.gatewayUrl = config.gatewayUrl;
     this.schemaId = config.schemaId;
     this.type = config.type;
   }
@@ -49,9 +49,9 @@ export class Sender extends Client {
     };
 
     /**
-     * Note that the Client interceptor will add the Authorization header because this.apiUrl is configured as an api url.
+     * Note that the Client interceptor will add the Authorization header because this.gatewayUrl is configured as an api url.
      */
-    return this.axiosInstance.post(this.apiUrl, this.type.toBuffer(apiStreamEvent), {
+    return this.axiosInstance.post(this.gatewayUrl, this.type.toBuffer(apiStreamEvent), {
       headers: {
         "Content-Type": "application/octet-stream",
         "Strm-Serialization-Type": "application/x-avro-binary",

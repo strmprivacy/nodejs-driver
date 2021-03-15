@@ -1,4 +1,3 @@
-import { Type } from "avsc";
 import { Client, ClientConfig, ClientEvents } from "./client";
 import * as Websocket from "ws";
 import { ApiStreamEvent } from "./models/event";
@@ -12,19 +11,16 @@ interface ReceiverEvents extends ClientEvents {
 }
 
 export interface ReceiverConfig extends ClientConfig {
-  schemaUrl: string;
+  egressUrl: string;
 }
 
 export class Receiver extends Client<ReceiverEvents> {
   private websocket: Websocket | undefined;
-  private readonly schemaUrl: string;
-  private cache: {
-    [key: string]: Type;
-  } = {};
+  private readonly egressUrl: string;
 
   constructor(config: ReceiverConfig) {
     super(config);
-    this.schemaUrl = config.schemaUrl;
+    this.egressUrl = config.egressUrl;
   }
 
   async connect(): Promise<void> {
@@ -40,14 +36,14 @@ export class Receiver extends Client<ReceiverEvents> {
      * dealing with websockets then we'll have to manually refresh (disconnect -> connect) this socket with a new
      * Bearer header everytime the token changes.
      */
-    this.websocket = new Websocket(`${this.schemaUrl}/ws?asJson=true`, {
+    this.websocket = new Websocket(`${this.egressUrl}/ws?asJson=true`, {
       headers: { ...this.getBearerHeader() },
     });
 
     this.websocket.on("open", () => {
       console.debug("websocket connected");
       /**
-       * @todo: Could emit `connect` event
+       * Could emit `connect` event
        */
     });
 
@@ -73,18 +69,5 @@ export class Receiver extends Client<ReceiverEvents> {
     if (this.websocket) {
       this.websocket.close();
     }
-  }
-
-  /**
-   * return a Promise to avsc interpreted schema definition.
-   * @todo: Memory cache enough?
-   */
-  private async getSchemaById(schemaId: number): Promise<Type> {
-    const cacheKey = `schema${schemaId}`;
-    if (this.cache[cacheKey] === undefined) {
-      const { data } = await this.axiosInstance.get(`${this.schemaUrl}/schemas/ids/${schemaId}`);
-      this.cache[cacheKey] = Type.forSchema(JSON.parse(data.schema));
-    }
-    return this.cache[cacheKey];
   }
 }
