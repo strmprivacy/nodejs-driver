@@ -22,7 +22,16 @@ export class Sender extends Client {
   private readonly gatewayUrl: string;
   private readonly schemaId: string;
   private readonly type: Type;
-  private client: ClientHttp2Session | undefined;
+  private _session: ClientHttp2Session | undefined;
+
+  private static HTTP_SESSION_INACTIVITY_TIMEOUT_IN_MS = 1000 * 60;
+
+  private get session(): ClientHttp2Session {
+    if (this._session === undefined || this._session.closed) {
+      this._session = this.createSession();
+    }
+    return this._session;
+  }
 
   constructor(config: SenderConfig) {
     /**
@@ -34,17 +43,14 @@ export class Sender extends Client {
     this.type = config.type;
   }
 
-  async connect(): Promise<void> {
-    await super.connect();
-    this.client = http2.connect(this.gatewayUrl);
-  }
-
   async disconnect(): Promise<void> {
     await super.disconnect();
-    if (this.client === undefined) {
-      throw Error("No connection");
+    /**
+     * No call to `this.session` because we don't want to potentially reconnect.
+     */
+    if (this._session !== undefined && !this._session.closed) {
+      this._session.close();
     }
-    this.client.close();
   }
 
   /**
@@ -64,15 +70,17 @@ export class Sender extends Client {
       },
     };
 
-    if (this.client === undefined) {
-      throw Error("No connection");
-    }
-
-    return post(this.client, "/event", this.type.toBuffer(apiStreamEvent), {
+    return post(this.session, "/event", this.type.toBuffer(apiStreamEvent), {
       [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/octet-stream",
       "Strm-Serialization-Type": "application/x-avro-binary",
       "Strm-Schema-Id": this.schemaId,
       ...this.getBearerHeader(),
     });
+  }
+
+  private createSession(): ClientHttp2Session {
+    const session = http2.connect(this.gatewayUrl);
+    session.setTimeout(Sender.HTTP_SESSION_INACTIVITY_TIMEOUT_IN_MS, () => session.close());
+    return session;
   }
 }

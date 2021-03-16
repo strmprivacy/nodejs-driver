@@ -6,20 +6,27 @@ interface Http2Response<T> {
   data?: T;
 }
 
+/**
+ * Http2 post implementation
+ * @param urlOrSession Url opens/closes a new session | Session is maintained externally.
+ * @param path Endpoint path.
+ * @param dataStringOrBuffer Data string is converted to a buffer | Buffer is used as-is.
+ * @param headers Request headers
+ */
 export function post<R = undefined>(
-  urlOrClient: string | ClientHttp2Session,
+  urlOrSession: string | ClientHttp2Session,
   path: string,
   dataStringOrBuffer: string | Buffer,
   headers: OutgoingHttpHeaders = {}
 ): Promise<Http2Response<R>> {
   return new Promise<Http2Response<R>>((resolve, reject) => {
-    const client: ClientHttp2Session =
-      typeof urlOrClient === "string" ? connect(urlOrClient) : urlOrClient;
+    const session: ClientHttp2Session =
+      typeof urlOrSession === "string" ? connect(urlOrSession) : urlOrSession;
 
-    const buffer =
+    const buffer: Buffer =
       typeof dataStringOrBuffer === "string" ? Buffer.from(dataStringOrBuffer) : dataStringOrBuffer;
 
-    const request = client.request({
+    const request = session.request({
       [constants.HTTP2_HEADER_SCHEME]: "https",
       [constants.HTTP2_HEADER_METHOD]: constants.HTTP2_METHOD_POST,
       [constants.HTTP2_HEADER_PATH]: path,
@@ -39,9 +46,6 @@ export function post<R = undefined>(
       contentType = headers[constants.HTTP2_HEADER_CONTENT_TYPE] as string;
     });
 
-    request.write(buffer);
-
-    const isLocalClientSession = typeof urlOrClient === "string";
     request.on("end", () => {
       const body = chunks.join();
       if (status === 200) {
@@ -56,12 +60,17 @@ export function post<R = undefined>(
       } else {
         reject({ status, data: body });
       }
-
-      if (isLocalClientSession) {
-        client.close();
+      /**
+       * Only close session if it was created within this method.
+       */
+      if (typeof urlOrSession === "string") {
+        session.close();
       }
     });
 
+    request.on("error", reject);
+    request.on("aborted", reject);
+    request.write(buffer);
     request.end();
   });
 }
