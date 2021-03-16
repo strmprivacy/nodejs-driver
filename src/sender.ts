@@ -1,7 +1,8 @@
 import { Type } from "avsc";
 import { Client, ClientConfig } from "./client";
-import { AxiosResponse } from "axios";
 import { ApiStreamEvent, ClientStreamEvent } from "./models/event";
+import * as http2 from "http2";
+import { ClientHttp2Session } from "http2";
 
 /**
  * Supported events and their handlers.
@@ -20,6 +21,7 @@ export class Sender extends Client {
   private readonly gatewayUrl: string;
   private readonly schemaId: string;
   private readonly type: Type;
+  private client: ClientHttp2Session | undefined;
 
   constructor(config: SenderConfig) {
     /**
@@ -31,10 +33,18 @@ export class Sender extends Client {
     this.type = config.type;
   }
 
+  async connect(): Promise<void> {
+    await super.connect();
+    /**
+     * @TODO: Needs improvement
+     */
+    this.client = http2.connect(this.gatewayUrl);
+  }
+
   /**
    * Sends an event
    */
-  async send<T extends ClientStreamEvent>(event: T): Promise<AxiosResponse> {
+  async send<T extends ClientStreamEvent>(event: T): Promise<any> {
     /**
      * Merges ClientStreamEvent with missing fields of ApiStreamEvent to create an ApiStreamEvent
      */
@@ -48,22 +58,15 @@ export class Sender extends Client {
       },
     };
 
-    /**
-     * Note that the Client interceptor will add the Authorization header because this.gatewayUrl is configured as an api url.
-     */
-    return this.axiosInstance.post(this.gatewayUrl, this.type.toBuffer(apiStreamEvent), {
-      headers: {
-        "Content-Type": "application/octet-stream",
-        "Strm-Serialization-Type": "application/x-avro-binary",
-        "Strm-Schema-Id": this.schemaId,
-        ...this.getBearerHeader(),
-      },
+    if (this.client === undefined) {
+      throw Error("No connection");
+    }
+
+    return this.post(this.client, "/event", this.type.toBuffer(apiStreamEvent), {
+      [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/octet-stream",
+      "Strm-Serialization-Type": "application/x-avro-binary",
+      "Strm-Schema-Id": this.schemaId,
+      ...this.getBearerHeader(),
     });
-    /**
-     * @todo: Could throw an error if the status is not 204.
-     */
-    /**
-     * @todo: Could introduce an event for a successful 'send'
-     */
   }
 }
