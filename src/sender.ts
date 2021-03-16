@@ -3,7 +3,7 @@ import { Client, ClientConfig } from "./client";
 import { ApiStreamEvent, ClientStreamEvent } from "./models/event";
 import * as http2 from "http2";
 import { ClientHttp2Session } from "http2";
-import { post } from "./http";
+import { Http2Response, post } from "./http";
 
 /**
  * Supported events and their handlers.
@@ -56,7 +56,7 @@ export class Sender extends Client {
   /**
    * Sends an event
    */
-  async send<T extends ClientStreamEvent>(event: T): Promise<any> {
+  async send<T extends ClientStreamEvent>(event: T): Promise<Http2Response<undefined>> {
     /**
      * Merges ClientStreamEvent with missing fields of ApiStreamEvent to create an ApiStreamEvent
      */
