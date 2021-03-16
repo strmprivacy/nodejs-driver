@@ -35,10 +35,15 @@ export class Sender extends Client {
 
   async connect(): Promise<void> {
     await super.connect();
-    /**
-     * @TODO: Needs improvement
-     */
     this.client = http2.connect(this.gatewayUrl);
+  }
+
+  async disconnect(): Promise<void> {
+    await super.disconnect();
+    if (this.client === undefined) {
+      throw Error("No connection");
+    }
+    this.client.close();
   }
 
   /**

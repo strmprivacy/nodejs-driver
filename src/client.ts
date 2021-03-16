@@ -1,8 +1,13 @@
 import { EventEmitter } from "events";
 import TypedEmitter from "typed-emitter";
-import { OutgoingHttpHeaders } from "http";
 import * as http2 from "http2";
-import { ClientHttp2Session, Http2ServerResponse } from "http2";
+import {
+  ClientHttp2Session,
+  connect,
+  constants,
+  Http2ServerResponse,
+  OutgoingHttpHeaders,
+} from "http2";
 
 /**
  * Token definition
@@ -36,6 +41,11 @@ export interface ClientEvents {
   error: (error: http2.Http2ServerResponse | Error) => void;
   disconnect: () => void;
   authenticate: () => void;
+}
+
+export interface Http2Response<T> {
+  status: number;
+  data?: T;
 }
 
 /**
@@ -112,58 +122,66 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
         [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
       }
     );
-    return data;
+    return data!;
   }
 
-  protected post<R>(
+  protected post<R = undefined>(
     urlOrClient: string | ClientHttp2Session,
     path: string,
-    dataOrBuffer: string | Buffer,
+    dataStringOrBuffer: string | Buffer,
     headers: OutgoingHttpHeaders = {}
-  ): Promise<{
-    status: number;
-    data: R;
-  }> {
+  ): Promise<Http2Response<R>> {
     const client: ClientHttp2Session =
-      typeof urlOrClient === "string" ? http2.connect(urlOrClient) : urlOrClient;
+      typeof urlOrClient === "string" ? connect(urlOrClient) : urlOrClient;
 
-    const buffer = typeof dataOrBuffer === "string" ? Buffer.from(dataOrBuffer) : dataOrBuffer;
+    const buffer =
+      typeof dataStringOrBuffer === "string" ? Buffer.from(dataStringOrBuffer) : dataStringOrBuffer;
 
     const request = client.request({
-      [http2.constants.HTTP2_HEADER_SCHEME]: "https",
-      [http2.constants.HTTP2_HEADER_METHOD]: http2.constants.HTTP2_METHOD_POST,
-      [http2.constants.HTTP2_HEADER_PATH]: path,
-      [http2.constants.HTTP2_HEADER_CONTENT_LENGTH]: Buffer.byteLength(buffer),
+      [constants.HTTP2_HEADER_SCHEME]: "https",
+      [constants.HTTP2_HEADER_METHOD]: constants.HTTP2_METHOD_POST,
+      [constants.HTTP2_HEADER_PATH]: path,
+      [constants.HTTP2_HEADER_CONTENT_LENGTH]: Buffer.byteLength(buffer),
       ...headers,
     });
     request.setEncoding("utf8");
 
     const chunks: string[] = [];
-    request.on("data", (chunk) => {
-      chunks.push(chunk);
-    });
+    request.on("data", (chunk) => chunks.push(chunk));
 
     let status: number;
+    let contentType: string;
 
     request.on("response", (headers, flags) => {
-      if (headers[http2.constants.HTTP2_HEADER_STATUS]) {
-        status = parseInt(headers[http2.constants.HTTP2_HEADER_STATUS] as string, 10);
-      }
+      status = parseInt(headers[constants.HTTP2_HEADER_STATUS] as string, 10);
+      contentType = headers[constants.HTTP2_HEADER_CONTENT_TYPE] as string;
     });
 
     request.write(buffer);
-    request.end();
 
-    return new Promise((resolve, reject) => {
+    const isLocalClientSession = typeof urlOrClient === "string";
+    return new Promise<Http2Response<R>>((resolve, reject) => {
       request.on("end", () => {
         const response = chunks.join();
-        const data = response.length > 0 ? JSON.parse(response) : response;
-        resolve({
-          status,
-          data,
-        });
+        if (status === 200) {
+          const data = contentType.includes("text/plain")
+            ? response
+            : contentType.includes("application/json")
+            ? JSON.parse(response)
+            : undefined;
+          resolve({ status, data });
+        } else if (status === 204) {
+          resolve({ status });
+        } else {
+          reject({ status, data: response });
+        }
+
+        if (isLocalClientSession) {
+          client.close();
+        }
       });
-      request.on("error", reject);
+
+      request.end();
     });
   }
   /**
@@ -222,7 +240,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
         [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
       }
     );
-    return data;
+    return data!;
   }
 
   /**
