@@ -43,18 +43,18 @@ export function post<R = undefined>(
   const isLocalClientSession = typeof urlOrClient === "string";
   return new Promise<Http2Response<R>>((resolve, reject) => {
     request.on("end", () => {
-      const response = chunks.join();
+      const body = chunks.join();
       if (status === 200) {
         const data = contentType.includes("text/plain")
-          ? response
+          ? body
           : contentType.includes("application/json")
-          ? JSON.parse(response)
+          ? JSON.parse(body)
           : undefined;
         resolve({ status, data });
       } else if (status === 204) {
         resolve({ status });
       } else {
-        reject({ status, data: response });
+        reject({ status, data: body });
       }
 
       if (isLocalClientSession) {
