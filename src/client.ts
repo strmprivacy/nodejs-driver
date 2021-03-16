@@ -1,13 +1,7 @@
 import { EventEmitter } from "events";
 import TypedEmitter from "typed-emitter";
-import * as http2 from "http2";
-import {
-  ClientHttp2Session,
-  connect,
-  constants,
-  Http2ServerResponse,
-  OutgoingHttpHeaders,
-} from "http2";
+import { constants, Http2ServerResponse } from "http2";
+import { post } from "./http";
 
 /**
  * Token definition
@@ -38,14 +32,9 @@ export enum HTTP_STATUS_CODE {
  * @todo: Add/remove events based on requirements
  */
 export interface ClientEvents {
-  error: (error: http2.Http2ServerResponse | Error) => void;
+  error: (error: Http2ServerResponse | Error) => void;
   disconnect: () => void;
   authenticate: () => void;
-}
-
-export interface Http2Response<T> {
-  status: number;
-  data?: T;
 }
 
 /**
@@ -110,7 +99,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   }
 
   private async authenticate(): Promise<JwtToken> {
-    const { data } = await this.post<JwtToken>(
+    const { data } = await post<JwtToken>(
       this.config.stsUrl,
       "/auth",
       JSON.stringify({
@@ -119,71 +108,12 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
         clientSecret: this.config.clientSecret,
       }),
       {
-        [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
       }
     );
     return data!;
   }
 
-  protected post<R = undefined>(
-    urlOrClient: string | ClientHttp2Session,
-    path: string,
-    dataStringOrBuffer: string | Buffer,
-    headers: OutgoingHttpHeaders = {}
-  ): Promise<Http2Response<R>> {
-    const client: ClientHttp2Session =
-      typeof urlOrClient === "string" ? connect(urlOrClient) : urlOrClient;
-
-    const buffer =
-      typeof dataStringOrBuffer === "string" ? Buffer.from(dataStringOrBuffer) : dataStringOrBuffer;
-
-    const request = client.request({
-      [constants.HTTP2_HEADER_SCHEME]: "https",
-      [constants.HTTP2_HEADER_METHOD]: constants.HTTP2_METHOD_POST,
-      [constants.HTTP2_HEADER_PATH]: path,
-      [constants.HTTP2_HEADER_CONTENT_LENGTH]: Buffer.byteLength(buffer),
-      ...headers,
-    });
-    request.setEncoding("utf8");
-
-    const chunks: string[] = [];
-    request.on("data", (chunk) => chunks.push(chunk));
-
-    let status: number;
-    let contentType: string;
-
-    request.on("response", (headers, flags) => {
-      status = parseInt(headers[constants.HTTP2_HEADER_STATUS] as string, 10);
-      contentType = headers[constants.HTTP2_HEADER_CONTENT_TYPE] as string;
-    });
-
-    request.write(buffer);
-
-    const isLocalClientSession = typeof urlOrClient === "string";
-    return new Promise<Http2Response<R>>((resolve, reject) => {
-      request.on("end", () => {
-        const response = chunks.join();
-        if (status === 200) {
-          const data = contentType.includes("text/plain")
-            ? response
-            : contentType.includes("application/json")
-            ? JSON.parse(response)
-            : undefined;
-          resolve({ status, data });
-        } else if (status === 204) {
-          resolve({ status });
-        } else {
-          reject({ status, data: response });
-        }
-
-        if (isLocalClientSession) {
-          client.close();
-        }
-      });
-
-      request.end();
-    });
-  }
   /**
    * Method that keeps the auth session alive.
    */
@@ -232,12 +162,12 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    * Refreshes the token.
    */
   private async refresh(oldToken: JwtToken): Promise<JwtToken> {
-    const { data } = await this.post<JwtToken>(
+    const { data } = await post<JwtToken>(
       `${this.config.stsUrl}`,
       "refresh",
       JSON.stringify(oldToken),
       {
-        [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
       }
     );
     return data!;

@@ -3,6 +3,7 @@ import { Client, ClientConfig } from "./client";
 import { ApiStreamEvent, ClientStreamEvent } from "./models/event";
 import * as http2 from "http2";
 import { ClientHttp2Session } from "http2";
+import { post } from "./http";
 
 /**
  * Supported events and their handlers.
@@ -67,7 +68,7 @@ export class Sender extends Client {
       throw Error("No connection");
     }
 
-    return this.post(this.client, "/event", this.type.toBuffer(apiStreamEvent), {
+    return post(this.client, "/event", this.type.toBuffer(apiStreamEvent), {
       [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/octet-stream",
       "Strm-Serialization-Type": "application/x-avro-binary",
       "Strm-Schema-Id": this.schemaId,
