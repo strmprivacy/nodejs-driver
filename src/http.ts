@@ -47,7 +47,7 @@ export function post<R = undefined>(
     });
 
     request.on("end", () => {
-      const body = chunks.join();
+      const body = chunks.join("");
       if (status === 200) {
         const data = contentType.includes("text/plain")
           ? body
