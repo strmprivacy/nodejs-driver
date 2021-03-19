@@ -10,6 +10,7 @@ export interface JwtToken {
   idToken: string;
   refreshToken: string;
   expiresAt: number;
+  grantType: string;
 }
 
 /**
@@ -162,6 +163,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    * Refreshes the token.
    */
   private async refresh(oldToken: JwtToken): Promise<JwtToken> {
+      console.debug("refresh");
     const { data } = await post<JwtToken>(
       `${this.config.stsUrl}`,
       "refresh",
@@ -170,6 +172,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
         [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
       }
     );
+    console.debug(data);
     return data!;
   }
 
@@ -181,6 +184,8 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
       return -1;
     }
     const timeUntilExpirationInSec = this.token.expiresAt - new Date().getTime() / 1000;
-    return (timeUntilExpirationInSec - Client.SEC_BEFORE_EXPIRATION) * 1000;
+    // return (timeUntilExpirationInSec - Client.SEC_BEFORE_EXPIRATION) * 1000;
+
+    return 3000;
   }
 }

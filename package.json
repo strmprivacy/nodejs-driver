@@ -9,14 +9,17 @@
     "test": "jest",
     "build-browser": "npm run dev && browserify ./dist/index.js --s StreamMachine | uglifyjs > ./dist/web.js",
     "dev": "webpack --config webpack.dev.js",
-    "prod": "npm test && webpack --config webpack.prod.js"
+    "prod": "npm test && webpack --config webpack.prod.js",
+    "demo": "ts-node ./src/demoSender.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@streammachine.io/schema-nps-unified": "^3.0.0",
     "avsc": "^5.5.3",
     "buffer": "^6.0.3",
+    "ts-node": "^9.1.1",
     "typed-emitter": "^1.3.1",
     "ws": "^7.4.0"
   },

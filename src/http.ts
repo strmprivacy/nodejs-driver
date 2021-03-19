@@ -20,6 +20,7 @@ export function post<R = undefined>(
   headers: OutgoingHttpHeaders = {}
 ): Promise<Http2Response<R>> {
   return new Promise<Http2Response<R>>((resolve, reject) => {
+    console.debug("Posting to ", urlOrSession, path);
     const session: ClientHttp2Session =
       typeof urlOrSession === "string" ? connect(urlOrSession) : urlOrSession;
 
@@ -48,6 +49,7 @@ export function post<R = undefined>(
 
     request.on("end", () => {
       const body = chunks.join("");
+      console.debug("received ", body.length, "bytes");
       if (status === 200) {
         const data = contentType.includes("text/plain")
           ? body
