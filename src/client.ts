@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import TypedEmitter from "typed-emitter";
-import { constants, Http2ServerResponse } from "http2";
-import { post } from "./http";
+import { constants } from "http2";
+import { Http2Response, post } from "./http";
 
 /**
  * Token definition
@@ -32,7 +32,7 @@ export enum HTTP_STATUS_CODE {
  * @todo: Add/remove events based on requirements
  */
 export interface ClientEvents {
-  error: (error: Http2ServerResponse | Error) => void;
+  error: (error: Http2Response | Error) => void;
   disconnect: () => void;
   authenticate: () => void;
 }
@@ -131,13 +131,13 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
           this.token = await this.refresh(token);
           this.scheduleRefresh(this.token);
         } catch (error) {
-          const statusCode = (error as Http2ServerResponse).statusCode;
+          const status = (error as Http2Response<Error>).status;
           /**
            * Retry mechanism
            */
           if (
-            statusCode !== HTTP_STATUS_CODE.UNAUTHORIZED &&
-            statusCode !== HTTP_STATUS_CODE.BAD_REQUEST &&
+            status !== HTTP_STATUS_CODE.UNAUTHORIZED &&
+            status !== HTTP_STATUS_CODE.BAD_REQUEST &&
             retryAttempt < Client.FAILED_REQUEST_RETRY_ATTEMPTS
           ) {
             await this.scheduleRefresh(token, ++retryAttempt);

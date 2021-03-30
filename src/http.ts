@@ -1,7 +1,7 @@
 import { ClientHttp2Session, connect, constants } from "http2";
 import { OutgoingHttpHeaders } from "http";
 
-export interface Http2Response<T> {
+export interface Http2Response<T = unknown> {
   status: number;
   data?: T;
 }

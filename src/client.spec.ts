@@ -1,11 +1,11 @@
 import { Client, ClientConfig, HTTP_STATUS_CODE, JwtToken } from "./client";
-
-type Mock<T> = Partial<Record<keyof T, jest.SpyInstance>>;
+import * as http from "./http";
+import { Http2Response } from "./http";
 
 /**
  * @TODO: Fix unit tests
  */
-xdescribe("Client", () => {
+describe("Client", () => {
   class TestClient extends Client {
     constructor(config: ClientConfig) {
       super(config);
@@ -27,31 +27,19 @@ xdescribe("Client", () => {
     refreshToken: "refreshToken",
   };
 
+  const MOCK_AUTH_RESPONSE: Http2Response<JwtToken> = { status: 200, data: MOCK_TOKEN };
+
   const TIME_BEFORE_TOKEN_EXPIRES = MOCK_TOKEN.expiresAt * 1000 - NOW_IN_MS;
 
   let client: Client;
-
-  let axiosInstance: any &
-    Record<"interceptors", { request: { use: jest.SpyInstance } }>;
+  let postSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.useFakeTimers("modern");
     jest.setSystemTime(NOW_IN_MS);
 
-    axiosInstance = {
-      post: jest.fn(),
-      interceptors: {
-        request: {
-          use: jest.fn(),
-        },
-      },
-    };
-
-    // jest.spyOn(axios, "create").mockReturnValue(axiosInstance as any);
-
-    axiosInstance.post!.mockResolvedValue({
-      data: MOCK_TOKEN,
-    });
+    postSpy = jest.spyOn(http, "post");
+    postSpy.mockResolvedValue(MOCK_AUTH_RESPONSE);
 
     client = new TestClient(MOCK_CONFIG);
   });
@@ -73,12 +61,13 @@ xdescribe("Client", () => {
     it("should send an auth request on connect", async () => {
       await client.connect();
 
-      expect(axiosInstance.post).toHaveBeenCalledTimes(1);
-      expect(axiosInstance.post).toHaveBeenCalledWith(MOCK_CONFIG.stsUrl + "/auth", {
-        billingId: MOCK_CONFIG.billingId,
-        clientId: MOCK_CONFIG.clientId,
-        clientSecret: MOCK_CONFIG.clientSecret,
-      });
+      expect(http.post).toHaveBeenCalledTimes(1);
+      expect(http.post).toHaveBeenCalledWith(
+        "authUrl",
+        "/auth",
+        '{"billingId":"billingId","clientId":"clientId","clientSecret":"secret"}',
+        { "content-type": "application/json" }
+      );
     });
 
     it("should store the token after a successful connect", async () => {
@@ -88,12 +77,12 @@ xdescribe("Client", () => {
 
     it("should throw if auth fails on connect", async () => {
       const ERROR = new Error();
-      axiosInstance.post!.mockRejectedValue(ERROR);
+      postSpy.mockRejectedValue(ERROR);
       await expect(client.connect()).rejects.toEqual(ERROR);
     });
 
     it("should throw if the token is expired", async () => {
-      axiosInstance.post!.mockResolvedValue({
+      postSpy.mockResolvedValue({
         data: {
           ...MOCK_TOKEN,
           expiresAt: NOW_IN_MS / 1000,
@@ -128,30 +117,35 @@ xdescribe("Client", () => {
     it(`should refresh the token ${Client.SEC_BEFORE_EXPIRATION}sec before it expires`, async () => {
       await client.connect();
 
-      axiosInstance.post!.mockClear();
+      postSpy.mockClear();
 
       await tick(TIME_BEFORE_REFRESH_ATTEMPT - 1);
 
-      expect(axiosInstance.post).not.toHaveBeenCalled();
+      expect(postSpy).not.toHaveBeenCalled();
 
       await tick(1);
 
-      expect(axiosInstance.post).toHaveBeenCalledWith(MOCK_CONFIG.stsUrl + "/refresh", MOCK_TOKEN);
+      expect(postSpy).toHaveBeenCalledWith(
+        "authUrl/refresh",
+        "refresh",
+        JSON.stringify(MOCK_TOKEN),
+        { "content-type": "application/json" }
+      );
     });
 
     it(`should retry ${Client.FAILED_REQUEST_RETRY_ATTEMPTS} times if refresh keeps failing`, async () => {
       client.on("error", () => {});
       await client.connect();
 
-      axiosInstance.post!.mockRejectedValue(new Error());
+      postSpy.mockRejectedValue(new Error());
 
       await flushFirstRefreshAttempt();
-      axiosInstance.post!.mockClear();
+      postSpy.mockClear();
 
       await flushRetryAttempts();
 
       expect(jest.getTimerCount()).toBe(0); // No more scheduled refresh attempts
-      expect(axiosInstance.post).toHaveBeenCalledTimes(Client.FAILED_REQUEST_RETRY_ATTEMPTS);
+      expect(postSpy).toHaveBeenCalledTimes(Client.FAILED_REQUEST_RETRY_ATTEMPTS);
     });
 
     it("should emit an error if all retry attempts fail", async () => {
@@ -162,7 +156,7 @@ xdescribe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockRejectedValue(ERROR);
+      postSpy.mockRejectedValue(ERROR);
 
       await flushAllRefreshAttempts();
 
@@ -182,7 +176,7 @@ xdescribe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockRejectedValue(ERROR);
+      postSpy.mockRejectedValue(ERROR);
 
       await flushAllRefreshAttempts();
 
@@ -195,19 +189,17 @@ xdescribe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockRejectedValue({
-        response: {
-          status: HTTP_STATUS_CODE.UNAUTHORIZED,
-        },
+      postSpy.mockRejectedValue({
+        status: HTTP_STATUS_CODE.UNAUTHORIZED,
       });
 
       await flushFirstRefreshAttempt();
 
-      axiosInstance.post!.mockClear();
+      postSpy.mockClear();
 
       await flushRetryAttempts();
 
-      expect(axiosInstance.post).not.toHaveBeenCalled();
+      expect(postSpy).not.toHaveBeenCalled();
       expect(jest.getTimerCount()).toBe(0);
     });
 
@@ -216,19 +208,17 @@ xdescribe("Client", () => {
 
       await client.connect();
 
-      axiosInstance.post!.mockRejectedValue({
-        response: {
-          status: HTTP_STATUS_CODE.BAD_REQUEST,
-        },
+      postSpy.mockRejectedValue({
+        status: HTTP_STATUS_CODE.BAD_REQUEST,
       });
 
       await flushFirstRefreshAttempt();
 
-      axiosInstance.post!.mockClear();
+      postSpy.mockClear();
 
       await flushRetryAttempts();
 
-      expect(axiosInstance.post).not.toHaveBeenCalled();
+      expect(postSpy).not.toHaveBeenCalled();
       expect(jest.getTimerCount()).toBe(0);
     });
   });
