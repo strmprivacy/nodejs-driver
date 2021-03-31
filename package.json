@@ -9,7 +9,8 @@
     "test": "jest",
     "build-browser": "npm run dev && browserify ./dist/index.js --s StreamMachine | uglifyjs > ./dist/web.js",
     "dev": "webpack --config webpack.dev.js",
-    "prod": "npm test && webpack --config webpack.prod.js"
+    "prod": "npm test && webpack --config webpack.prod.js",
+    "sender": "ts-node src/sender-example.ts"
   },
   "keywords": [],
   "author": "",
