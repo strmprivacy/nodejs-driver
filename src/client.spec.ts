@@ -126,8 +126,8 @@ describe("Client", () => {
       await tick(1);
 
       expect(postSpy).toHaveBeenCalledWith(
-        "authUrl/refresh",
-        "refresh",
+        "authUrl",
+        "/refresh",
         JSON.stringify(MOCK_TOKEN),
         { "content-type": "application/json" }
       );

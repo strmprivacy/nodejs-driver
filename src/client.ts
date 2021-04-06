@@ -163,8 +163,8 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    */
   private async refresh(oldToken: JwtToken): Promise<JwtToken> {
     const { data } = await post<JwtToken>(
-      `${this.config.stsUrl}/refresh`,
-      "refresh",
+      this.config.stsUrl,
+      "/refresh",
       JSON.stringify(oldToken),
       {
         [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
