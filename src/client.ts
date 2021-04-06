@@ -131,7 +131,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
           this.token = await this.refresh(token);
           this.scheduleRefresh(this.token);
         } catch (error) {
-          console.error(`got refresh error ${JSON.stringify(error)}`)
           const status = (error as Http2Response).status;
           /**
            * Retry mechanism
