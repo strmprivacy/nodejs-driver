@@ -1,8 +1,7 @@
-import axios, { AxiosError } from "axios";
 import { EventEmitter } from "events";
 import TypedEmitter from "typed-emitter";
-import * as http from "http";
-import * as https from "https";
+import { constants } from "http2";
+import { Http2Response, post } from "./http";
 
 /**
  * Token definition
@@ -33,7 +32,7 @@ export enum HTTP_STATUS_CODE {
  * @todo: Add/remove events based on requirements
  */
 export interface ClientEvents {
-  error: (error: AxiosError | Error) => void;
+  error: (error: Http2Response | Error) => void;
   disconnect: () => void;
   authenticate: () => void;
 }
@@ -46,18 +45,6 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
 })<T> {
   static readonly SEC_BEFORE_EXPIRATION = 60;
   static readonly FAILED_REQUEST_RETRY_ATTEMPTS = 3;
-
-  /**
-   * Separate instance of axios so it does not interfere with others.
-   */
-  protected axiosInstance = axios.create({
-    timeout: 5000,
-
-    //keepAlive pools and reuses TCP connections, so it's faster
-    httpAgent: new http.Agent({ keepAlive: true }),
-    httpsAgent: new https.Agent({ keepAlive: true }),
-
-  });
 
   /**
    * Token used for auth.
@@ -112,16 +99,19 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   }
 
   private async authenticate(): Promise<JwtToken> {
-    const { data } = await this.axiosInstance.post<JwtToken>(`${this.config.stsUrl}/auth`, {
-      billingId: this.config.billingId,
-      clientId: this.config.clientId,
-      clientSecret: this.config.clientSecret,
-    });
-    /**
-     * Optional: Emit an event
-     */
-    this.emit("authenticate");
-    return data;
+    const { data } = await post<JwtToken>(
+      this.config.stsUrl,
+      "/auth",
+      JSON.stringify({
+        billingId: this.config.billingId,
+        clientId: this.config.clientId,
+        clientSecret: this.config.clientSecret,
+      }),
+      {
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
+      }
+    );
+    return data!;
   }
 
   /**
@@ -141,13 +131,13 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
           this.token = await this.refresh(token);
           this.scheduleRefresh(this.token);
         } catch (error) {
-          const statusCode = (error as AxiosError).response?.status;
+          const status = (error as Http2Response).status;
           /**
            * Retry mechanism
            */
           if (
-            statusCode !== HTTP_STATUS_CODE.UNAUTHORIZED &&
-            statusCode !== HTTP_STATUS_CODE.BAD_REQUEST &&
+            status !== HTTP_STATUS_CODE.UNAUTHORIZED &&
+            status !== HTTP_STATUS_CODE.BAD_REQUEST &&
             retryAttempt < Client.FAILED_REQUEST_RETRY_ATTEMPTS
           ) {
             await this.scheduleRefresh(token, ++retryAttempt);
@@ -172,11 +162,15 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    * Refreshes the token.
    */
   private async refresh(oldToken: JwtToken): Promise<JwtToken> {
-    const { data } = await this.axiosInstance.post<JwtToken>(
-      `${this.config.stsUrl}/refresh`,
-      oldToken
+    const { data } = await post<JwtToken>(
+      this.config.stsUrl,
+      "/refresh",
+      JSON.stringify(oldToken),
+      {
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
+      }
     );
-    return data;
+    return data!;
   }
 
   /**
