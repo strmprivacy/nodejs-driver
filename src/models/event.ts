@@ -1,28 +1,20 @@
 /**
  * Stream event type.
  */
-interface StreamEvent<MetaData> {
-  strmMeta: MetaData;
-}
+export interface StrmEvent {
+  strmSchemaType: string;
+  strmSchemaRef: string
+  schema(): object
 
-/**
- * Stream event meta data type.
- */
-interface StreamEventMetaData {
-  schemaId: string;
-  nonce: number;
-  timestamp: number;
-  consentLevels: number[];
-}
+  strmMeta: StrmEventMetadata;
 
-/**
- * Type that represents the full event.
- */
-export interface ApiStreamEvent extends StreamEvent<StreamEventMetaData> {
   [key: string]: any;
 }
 
 /**
- * Type for event creation (event without values automatically assigned by the client).
+ * Stream event metadata type.
  */
-export type ClientStreamEvent = StreamEvent<Pick<StreamEventMetaData, "consentLevels">>;
+export interface StrmEventMetadata {
+  eventContractRef: string;
+  consentLevels: number[];
+}

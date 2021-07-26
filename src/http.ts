@@ -41,7 +41,7 @@ export function post<R = undefined>(
     let status: number;
     let contentType: string;
 
-    request.on("response", (headers, flags) => {
+    request.on("response", headers => {
       status = parseInt(headers[constants.HTTP2_HEADER_STATUS] as string, 10);
       contentType = headers[constants.HTTP2_HEADER_CONTENT_TYPE] as string;
     });

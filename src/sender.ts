@@ -1,9 +1,10 @@
 import { Type } from "avsc";
 import { Client, ClientConfig } from "./client";
-import { ApiStreamEvent, ClientStreamEvent } from "./models/event";
 import * as http2 from "http2";
 import { ClientHttp2Session } from "http2";
 import { Http2Response, post } from "./http";
+import { EventSerializerProvider, SerializationType } from "./serialization";
+import { StrmEvent } from "./models/event";
 
 /**
  * Supported events and their handlers.
@@ -11,7 +12,7 @@ import { Http2Response, post } from "./http";
  */
 export interface SenderConfig extends ClientConfig {
   gatewayUrl: string;
-  schemaId: string;
+  schemaRef: string;
   type: Type;
 }
 
@@ -20,8 +21,6 @@ export interface SenderConfig extends ClientConfig {
  */
 export class Sender extends Client {
   private readonly gatewayUrl: string;
-  private readonly schemaId: string;
-  private readonly type: Type;
   private _session: ClientHttp2Session | undefined;
 
   private static HTTP_SESSION_INACTIVITY_TIMEOUT_IN_MS = 1000 * 60;
@@ -39,8 +38,6 @@ export class Sender extends Client {
      */
     super(config);
     this.gatewayUrl = config.gatewayUrl;
-    this.schemaId = config.schemaId;
-    this.type = config.type;
   }
 
   async disconnect(): Promise<void> {
@@ -56,25 +53,15 @@ export class Sender extends Client {
   /**
    * Sends an event
    */
-  async send<T extends ClientStreamEvent>(event: T): Promise<Http2Response<undefined>> {
-    /**
-     * Merges ClientStreamEvent with missing fields of ApiStreamEvent to create an ApiStreamEvent
-     */
-    const apiStreamEvent: ApiStreamEvent = {
-      ...event,
-      strmMeta: {
-        ...event.strmMeta,
-        schemaId: this.schemaId,
-        nonce: 0,
-        timestamp: 0,
-      },
-    };
+  async send(event: StrmEvent, serializationType: SerializationType): Promise<Http2Response<undefined>> {
+    const eventSerializer = EventSerializerProvider.getEventSerializer(event.strmSchemaRef, event);
 
-    return post(this.session, "/event", this.type.toBuffer(apiStreamEvent), {
+    let bearerHeader = this.getBearerHeader();
+    return post(this.session, "/event", eventSerializer.serialize(event, serializationType), {
       [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/octet-stream",
       "Strm-Serialization-Type": "application/x-avro-binary",
-      "Strm-Schema-Id": this.schemaId,
-      ...this.getBearerHeader(),
+      "Strm-Schema-Ref": event.strmSchemaRef,
+      ...bearerHeader,
     });
   }
 
