@@ -1,10 +1,10 @@
-import { Type } from "avsc";
-import { Client, ClientConfig } from "./client";
-import * as http2 from "http2";
-import { ClientHttp2Session } from "http2";
-import { Http2Response, post } from "./http";
-import { EventSerializerProvider, SerializationType } from "./serialization";
-import { StrmEvent } from "./models/event";
+import { Type } from 'avsc';
+import { Client, ClientConfig } from './client';
+import * as http2 from 'http2';
+import { ClientHttp2Session } from 'http2';
+import { Http2Response, post } from './http';
+import { EventSerializerProvider, SerializationType } from './serialization';
+import { StrmEvent } from './models/event';
 
 /**
  * Supported events and their handlers.
@@ -53,14 +53,17 @@ export class Sender extends Client {
   /**
    * Sends an event
    */
-  async send(event: StrmEvent, serializationType: SerializationType): Promise<Http2Response<undefined>> {
+  async send(
+    event: StrmEvent,
+    serializationType: SerializationType
+  ): Promise<Http2Response<undefined>> {
     const eventSerializer = EventSerializerProvider.getEventSerializer(event.strmSchemaRef, event);
 
     let bearerHeader = this.getBearerHeader();
-    return post(this.session, "/event", eventSerializer.serialize(event, serializationType), {
-      [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: "application/octet-stream",
-      "Strm-Serialization-Type": "application/x-avro-binary",
-      "Strm-Schema-Ref": event.strmSchemaRef,
+    return post(this.session, '/event', eventSerializer.serialize(event, serializationType), {
+      [http2.constants.HTTP2_HEADER_CONTENT_TYPE]: 'application/octet-stream',
+      'Strm-Serialization-Type': 'application/x-avro-binary',
+      'Strm-Schema-Ref': event.strmSchemaRef,
       ...bearerHeader,
     });
   }

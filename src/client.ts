@@ -1,7 +1,7 @@
-import { EventEmitter } from "events";
-import TypedEmitter from "typed-emitter";
-import { constants } from "http2";
-import { Http2Response, post } from "./http";
+import { EventEmitter } from 'events';
+import TypedEmitter from 'typed-emitter';
+import { constants } from 'http2';
+import { Http2Response, post } from './http';
 
 /**
  * Token definition
@@ -74,7 +74,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
       this.token = await this.authenticate();
 
       if (this.getMsBeforeNextRefresh() < 0) {
-        throw new Error("Token expired");
+        throw new Error('Token expired');
       }
     }
 
@@ -95,20 +95,20 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
     /**
      * Emit an event
      */
-    this.emit("disconnect");
+    this.emit('disconnect');
   }
 
   private async authenticate(): Promise<JwtToken> {
     const { data } = await post<JwtToken>(
       this.config.stsUrl,
-      "/auth",
+      '/auth',
       JSON.stringify({
         billingId: this.config.billingId,
         clientId: this.config.clientId,
         clientSecret: this.config.clientSecret,
       }),
       {
-        [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: 'application/json',
       }
     );
     return data!;
@@ -142,7 +142,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
           ) {
             await this.scheduleRefresh(token, ++retryAttempt);
           } else {
-            this.emit("error", error);
+            this.emit('error', error);
             this.disconnect();
           }
         }
@@ -154,7 +154,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   /**
    * Returns the header used for auth.
    */
-  protected getBearerHeader(): Record<"Authorization", string> | {} {
+  protected getBearerHeader(): Record<'Authorization', string> | {} {
     return this.token ? { Authorization: `Bearer ${this.token.idToken}` } : {};
   }
 
@@ -164,10 +164,10 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   private async refresh(oldToken: JwtToken): Promise<JwtToken> {
     const { data } = await post<JwtToken>(
       this.config.stsUrl,
-      "/refresh",
+      '/refresh',
       JSON.stringify(oldToken),
       {
-        [constants.HTTP2_HEADER_CONTENT_TYPE]: "application/json",
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: 'application/json',
       }
     );
     return data!;

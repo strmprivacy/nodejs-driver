@@ -1,6 +1,6 @@
 import { Client, ClientConfig, ClientEvents } from './client';
 import * as Websocket from 'ws';
-import { StrmEvent } from "./models/event";
+import { StrmEvent } from './models/event';
 
 /**
  * Supported events and their handlers.
@@ -52,7 +52,9 @@ export class Receiver extends Client<ReceiverEvents> {
      */
     this.websocket.on('error', (error) => this.emit('error', error));
     this.websocket.on('close', (error) => this.emit('disconnect'));
-    this.websocket.on('unexpected-response', (error, response) => this.emit('error', new Error('Unexpected response')));
+    this.websocket.on('unexpected-response', (error, response) =>
+      this.emit('error', new Error('Unexpected response'))
+    );
 
     /**
      * Parse and process the incoming message and emit the result as `event`.

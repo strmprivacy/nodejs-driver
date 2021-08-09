@@ -3,8 +3,8 @@
  */
 export interface StrmEvent {
   strmSchemaType: string;
-  strmSchemaRef: string
-  schema(): object
+  strmSchemaRef: string;
+  schema(): object;
 
   strmMeta: StrmEventMetadata;
 
