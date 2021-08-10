@@ -1,3 +1,9 @@
+## [1.3.2](https://github.com/streammachineio/nodejs-driver/compare/v1.3.1...v1.3.2) (2021-08-10)
+
+### Bug Fixes
+
+- add npm run prod to build process ([51bc29f](https://github.com/streammachineio/nodejs-driver/commit/51bc29f82a0b3b55543c6a308d70cb5f4ca3d179))
+
 ## [1.3.1](https://github.com/streammachineio/nodejs-driver/compare/v1.3.0...v1.3.1) (2021-08-10)
 
 ### Bug Fixes
