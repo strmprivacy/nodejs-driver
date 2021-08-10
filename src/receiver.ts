@@ -1,13 +1,13 @@
-import { Client, ClientConfig, ClientEvents } from "./client";
-import * as Websocket from "ws";
-import { ApiStreamEvent } from "./models/event";
+import { Client, ClientConfig, ClientEvents } from './client';
+import * as Websocket from 'ws';
+import { StrmEvent } from './models/event';
 
 /**
  * Supported events and their handlers.
  * @todo: Add/remove events based on requirements
  */
 interface ReceiverEvents extends ClientEvents {
-  event: (event: ApiStreamEvent) => void;
+  event: (event: StrmEvent) => void;
 }
 
 export interface ReceiverConfig extends ClientConfig {
@@ -40,8 +40,8 @@ export class Receiver extends Client<ReceiverEvents> {
       headers: { ...this.getBearerHeader() },
     });
 
-    this.websocket.on("open", () => {
-      console.debug("websocket connected");
+    this.websocket.on('open', () => {
+      console.debug('websocket connected');
       /**
        * Could emit `connect` event
        */
@@ -50,16 +50,20 @@ export class Receiver extends Client<ReceiverEvents> {
     /**
      * Forward the error to this client
      */
-    this.websocket.on("error", (error) => this.emit("error", error));
+    this.websocket.on('error', (error) => this.emit('error', error));
+    this.websocket.on('close', (error) => this.emit('disconnect'));
+    this.websocket.on('unexpected-response', (error, response) =>
+      this.emit('error', new Error('Unexpected response'))
+    );
 
     /**
      * Parse and process the incoming message and emit the result as `event`.
      */
-    this.websocket.on("message", async (message: string) => {
+    this.websocket.on('message', async (message: string) => {
       try {
-        this.emit("event", JSON.parse(message));
+        this.emit('event', JSON.parse(message));
       } catch (error) {
-        this.emit("error", error);
+        this.emit('error', error);
       }
     });
   }

@@ -7,9 +7,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
-    "build-browser": "npm run dev && browserify ./dist/index.js --s StreamMachine | uglifyjs > ./dist/web.js",
     "dev": "webpack --config webpack.dev.js",
-    "prod": "npm test && webpack --config webpack.prod.js"
+    "prod": "npm test && webpack --config webpack.prod.js",
+    "postinstall": "husky install",
+    "semantic-release": "semantic-release"
   },
   "keywords": [],
   "author": "",
@@ -25,23 +26,67 @@
     "@types/jest": "^26.0.16",
     "@types/node": "^14.14.10",
     "@types/ws": "^7.4.0",
-    "browserify": "^17.0.0",
     "fs": "0.0.1-security",
+    "husky": "^7.0.1",
     "jest": "^26.6.3",
-    "prettier": "^2.2.0",
+    "lint-staged": "^11.1.2",
+    "prettier": "2.3.2",
     "raw-loader": "^4.0.2",
-    "stream-browserify": "^3.0.0",
     "ts-jest": "^26.4.4",
     "ts-loader": "^8.0.11",
     "typescript": "^4.1.2",
-    "uglify-js": "^3.12.0",
-    "uglifyify": "^5.0.2",
     "webpack": "^5.7.0",
     "webpack-cli": "^4.2.0",
     "webpack-merge": "^5.4.0",
-    "webpack-node-externals": "^2.5.2"
+    "webpack-node-externals": "^2.5.2",
+    "@commitlint/config-conventional": "^12.1.1",
+    "@google/semantic-release-replace-plugin": "^1.0.2",
+    "@semantic-release/changelog": "5.0.1",
+    "@semantic-release/exec": "^5.0.0",
+    "@semantic-release/git": "9.0.0",
+    "@semantic-release/github": "^7.2.3",
+    "commitlint": "12.1.1",
+    "conventional-changelog-conventionalcommits": "4.5.0",
+    "cz-conventional-changelog": "^3.3.0",
+    "gradle-semantic-release-plugin": "1.4.17",
+    "semantic-release": "17.4.2"
   },
   "prettier": {
-    "printWidth": 100
+    "printWidth": 100,
+    "singleQuote": true
+  },
+  "lint-staged": {
+    "**/*": "prettier --write --ignore-unknown"
+  },
+  "release": {
+    "branches": [
+      "master"
+    ],
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/changelog",
+      [
+        "@semantic-release/git",
+        {
+          "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}",
+          "assets": [
+            "package.json",
+            "CHANGELOG.md"
+          ]
+        }
+      ],
+      "@semantic-release/github"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
   }
 }

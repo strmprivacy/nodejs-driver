@@ -1,11 +1,11 @@
-import { Client, ClientConfig, HTTP_STATUS_CODE, JwtToken } from "./client";
-import * as http from "./http";
-import { Http2Response } from "./http";
+import { Client, ClientConfig, HTTP_STATUS_CODE, JwtToken } from './client';
+import * as http from './http';
+import { Http2Response } from './http';
 
 /**
  * @TODO: Fix unit tests
  */
-describe("Client", () => {
+describe('Client', () => {
   class TestClient extends Client {
     constructor(config: ClientConfig) {
       super(config);
@@ -13,18 +13,18 @@ describe("Client", () => {
   }
 
   const MOCK_CONFIG: ClientConfig = {
-    clientSecret: "secret",
-    clientId: "clientId",
-    billingId: "billingId",
-    stsUrl: "authUrl",
+    clientSecret: 'secret',
+    clientId: 'clientId',
+    billingId: 'billingId',
+    stsUrl: 'authUrl',
   };
 
-  const NOW_IN_MS = new Date("Tue Dec 02 2020 22:09:40 GMT+0100").getTime();
+  const NOW_IN_MS = new Date('Tue Dec 02 2020 22:09:40 GMT+0100').getTime();
 
   const MOCK_TOKEN: JwtToken = {
     expiresAt: NOW_IN_MS / 1000 + 60 * 60,
-    idToken: "idToken",
-    refreshToken: "refreshToken",
+    idToken: 'idToken',
+    refreshToken: 'refreshToken',
   };
 
   const MOCK_AUTH_RESPONSE: Http2Response<JwtToken> = { status: 200, data: MOCK_TOKEN };
@@ -35,10 +35,10 @@ describe("Client", () => {
   let postSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    jest.useFakeTimers("modern");
+    jest.useFakeTimers('modern');
     jest.setSystemTime(NOW_IN_MS);
 
-    postSpy = jest.spyOn(http, "post");
+    postSpy = jest.spyOn(http, 'post');
     postSpy.mockResolvedValue(MOCK_AUTH_RESPONSE);
 
     client = new TestClient(MOCK_CONFIG);
@@ -57,31 +57,31 @@ describe("Client", () => {
     return Promise.resolve();
   };
 
-  describe("Connect", () => {
-    it("should send an auth request on connect", async () => {
+  describe('Connect', () => {
+    it('should send an auth request on connect', async () => {
       await client.connect();
 
       expect(http.post).toHaveBeenCalledTimes(1);
       expect(http.post).toHaveBeenCalledWith(
-        "authUrl",
-        "/auth",
+        'authUrl',
+        '/auth',
         '{"billingId":"billingId","clientId":"clientId","clientSecret":"secret"}',
-        { "content-type": "application/json" }
+        { 'content-type': 'application/json' }
       );
     });
 
-    it("should store the token after a successful connect", async () => {
+    it('should store the token after a successful connect', async () => {
       await client.connect();
-      expect(client["token"]).toBe(MOCK_TOKEN);
+      expect(client['token']).toBe(MOCK_TOKEN);
     });
 
-    it("should throw if auth fails on connect", async () => {
+    it('should throw if auth fails on connect', async () => {
       const ERROR = new Error();
       postSpy.mockRejectedValue(ERROR);
       await expect(client.connect()).rejects.toEqual(ERROR);
     });
 
-    it("should throw if the token is expired", async () => {
+    it('should throw if the token is expired', async () => {
       postSpy.mockResolvedValue({
         data: {
           ...MOCK_TOKEN,
@@ -89,11 +89,11 @@ describe("Client", () => {
         },
       });
 
-      await expect(client.connect()).rejects.toEqual(new Error("Token expired"));
+      await expect(client.connect()).rejects.toEqual(new Error('Token expired'));
     });
   });
 
-  describe("Refreshing token", () => {
+  describe('Refreshing token', () => {
     const TIME_BEFORE_REFRESH_ATTEMPT =
       TIME_BEFORE_TOKEN_EXPIRES - Client.SEC_BEFORE_EXPIRATION * 1000;
 
@@ -125,16 +125,13 @@ describe("Client", () => {
 
       await tick(1);
 
-      expect(postSpy).toHaveBeenCalledWith(
-        "authUrl",
-        "/refresh",
-        JSON.stringify(MOCK_TOKEN),
-        { "content-type": "application/json" }
-      );
+      expect(postSpy).toHaveBeenCalledWith('authUrl', '/refresh', JSON.stringify(MOCK_TOKEN), {
+        'content-type': 'application/json',
+      });
     });
 
     it(`should retry ${Client.FAILED_REQUEST_RETRY_ATTEMPTS} times if refresh keeps failing`, async () => {
-      client.on("error", () => {});
+      client.on('error', () => {});
       await client.connect();
 
       postSpy.mockRejectedValue(new Error());
@@ -148,11 +145,11 @@ describe("Client", () => {
       expect(postSpy).toHaveBeenCalledTimes(Client.FAILED_REQUEST_RETRY_ATTEMPTS);
     });
 
-    it("should emit an error if all retry attempts fail", async () => {
+    it('should emit an error if all retry attempts fail', async () => {
       const errorSpy = jest.fn();
       const ERROR = new Error();
 
-      client.on("error", errorSpy);
+      client.on('error', errorSpy);
 
       await client.connect();
 
@@ -164,15 +161,15 @@ describe("Client", () => {
       expect(errorSpy).toHaveBeenCalledWith(ERROR);
     });
 
-    it("should disconnect if all retry attempts fail", async () => {
+    it('should disconnect if all retry attempts fail', async () => {
       const disconnectSpy = jest.fn();
       const ERROR = new Error();
 
-      client.on("disconnect", disconnectSpy);
+      client.on('disconnect', disconnectSpy);
       /**
        * Error will break Node if there's no handler registered.
        */
-      client.on("error", () => {});
+      client.on('error', () => {});
 
       await client.connect();
 
@@ -184,8 +181,8 @@ describe("Client", () => {
       expect(disconnectSpy).toHaveBeenCalledWith();
     });
 
-    it("should not retry if the server responds with unauthorized", async () => {
-      client.on("error", () => {});
+    it('should not retry if the server responds with unauthorized', async () => {
+      client.on('error', () => {});
 
       await client.connect();
 
@@ -203,8 +200,8 @@ describe("Client", () => {
       expect(jest.getTimerCount()).toBe(0);
     });
 
-    it("should not retry if the server responds with bad request", async () => {
-      client.on("error", () => {});
+    it('should not retry if the server responds with bad request', async () => {
+      client.on('error', () => {});
 
       await client.connect();
 
@@ -223,20 +220,20 @@ describe("Client", () => {
     });
   });
 
-  describe("Disconnect", () => {
+  describe('Disconnect', () => {
     beforeEach(async () => {
       await client.connect();
     });
 
-    it("should clear scheduled refresh", () => {
+    it('should clear scheduled refresh', () => {
       expect(jest.getTimerCount()).toBe(1);
       client.disconnect();
       expect(jest.getTimerCount()).toBe(0);
     });
 
-    it("should emit disconnect event", () => {
+    it('should emit disconnect event', () => {
       const spy = jest.fn();
-      client.on("disconnect", spy);
+      client.on('disconnect', spy);
       client.disconnect();
       expect(spy).toHaveBeenCalledTimes(1);
     });
