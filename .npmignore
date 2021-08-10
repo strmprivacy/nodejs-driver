@@ -10,3 +10,10 @@ examples
 *.spec.d.ts
 jest.config.json
 *.tgz
+.github
+.husky
+.prettierignore
+CHANGELOG.md
+Makefile
+README-DEV.md
+tsconfig.json
