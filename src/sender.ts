@@ -4,7 +4,7 @@ import * as http2 from 'http2';
 import { ClientHttp2Session } from 'http2';
 import { Http2Response, post } from './http';
 import { EventSerializerProvider, SerializationType } from './serialization';
-import { StrmEvent } from './models/event';
+import { StrmPrivacyEvent } from './models/event';
 
 /**
  * Supported events and their handlers.
@@ -54,7 +54,7 @@ export class Sender extends Client {
    * Sends an event
    */
   async send(
-    event: StrmEvent,
+    event: StrmPrivacyEvent,
     serializationType: SerializationType
   ): Promise<Http2Response<undefined>> {
     const eventSerializer = EventSerializerProvider.getEventSerializer(event.strmSchemaRef, event);

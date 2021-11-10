@@ -1,20 +1,20 @@
 /**
- * Stream event type.
+ * STRM Privacy event type.
  */
-export interface StrmEvent {
+export interface StrmPrivacyEvent {
   strmSchemaType: string;
   strmSchemaRef: string;
   schema(): object;
 
-  strmMeta: StrmEventMetadata;
+  strmMeta: StrmPrivacyEventMetadata;
 
   [key: string]: any;
 }
 
 /**
- * Stream event metadata type.
+ * STRM Privacy event metadata type.
  */
-export interface StrmEventMetadata {
+export interface StrmPrivacyEventMetadata {
   eventContractRef: string;
   consentLevels: number[];
 }

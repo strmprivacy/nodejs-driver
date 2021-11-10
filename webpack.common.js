@@ -18,7 +18,7 @@ module.exports = {
   output: {
     filename: 'index.js',
     libraryTarget: 'umd',
-    library: 'StreamMachine',
+    library: 'STRMPrivacy',
   },
   externals: [nodeExternals()],
 };

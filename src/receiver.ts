@@ -1,13 +1,13 @@
 import { Client, ClientConfig, ClientEvents } from './client';
 import * as Websocket from 'ws';
-import { StrmEvent } from './models/event';
+import { StrmPrivacyEvent } from './models/event';
 
 /**
  * Supported events and their handlers.
  * @todo: Add/remove events based on requirements
  */
 interface ReceiverEvents extends ClientEvents {
-  event: (event: StrmEvent) => void;
+  event: (event: StrmPrivacyEvent) => void;
 }
 
 export interface ReceiverConfig extends ClientConfig {
