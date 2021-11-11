@@ -1,4 +1,4 @@
-# StreamMachine client
+# STRM Privacy client
 
 ```
 npm i
@@ -30,7 +30,7 @@ npm pack
 
 cd examples/node
 npm i
-npm i ../../streammachine-nodejs-driver-1.0.0.tgz
+npm i ../../strmprivacy-nodejs-driver-1.0.0.tgz
 
 npm run sender
 npm run receiver
