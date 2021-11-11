@@ -1,3 +1,18 @@
+# [2.0.0](https://github.com/streammachineio/nodejs-driver/compare/v1.3.2...v2.0.0) (2021-11-11)
+
+### Bug Fixes
+
+- use old package lock ([4771482](https://github.com/streammachineio/nodejs-driver/commit/47714826839fa2c08a2211baf372d84de6ac75ec))
+
+### Features
+
+- rename to STRM Privacy ([f0762d9](https://github.com/streammachineio/nodejs-driver/commit/f0762d9706a3bff171b473d6f1abff3660fafe68))
+- set publish config to public explicitly ([45cfec9](https://github.com/streammachineio/nodejs-driver/commit/45cfec92da6f76ed83a99dbd9b5c12aac01bd9e9))
+
+### BREAKING CHANGES
+
+- Stream Machine -> STRM Privacy
+
 ## [1.3.2](https://github.com/strmprivacy/nodejs-driver/compare/v1.3.1...v1.3.2) (2021-08-10)
 
 ### Bug Fixes
