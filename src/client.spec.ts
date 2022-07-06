@@ -13,8 +13,8 @@ describe('Auth', () => {
     }
   }
   const MOCK_CONFIG: ClientConfig = {
-    clientSecret: 'l0CCpAHY2pTVPpjXMNUFjjePTmj7VLcO',
-    clientId: 'tafelpoot',
+    clientSecret: 'clientSecret',
+    clientId: 'clientId',
     authScheme: 'https',
     authHost: 'accounts.dev.strmprivacy.io',
     authEndpoint: '/auth/realms/streams/protocol/openid-connect/token',
