@@ -5,6 +5,44 @@ import { Http2Response } from './http';
 /**
  * @TODO: Fix unit tests
  */
+
+describe('Auth', () => {
+  class TestClient extends Client {
+    constructor(config: ClientConfig) {
+      super(config);
+    }
+  }
+  const MOCK_CONFIG: ClientConfig = {
+    clientSecret: 'l0CCpAHY2pTVPpjXMNUFjjePTmj7VLcO',
+    clientId: 'tafelpoot',
+    authScheme: 'https',
+    authHost: 'accounts.dev.strmprivacy.io',
+    authEndpoint: '/auth/realms/streams/protocol/openid-connect/token',
+  };
+
+  let client: Client;
+
+  beforeEach(() => {
+    client = new TestClient(MOCK_CONFIG);
+  });
+
+  describe('Auth', () => {
+    it('should be able to receive an access token', async () => {
+      await client.connect();
+      expect(client.getAccessToken()).not.toBeNull();
+    });
+  });
+
+  describe('Refresh', () => {
+    it('should be able to use refresh token', async () => {
+      await client.connect();
+      let token = client.getToken();
+      await client.refresh(token!);
+      expect(client.getToken()!.refresh_token).not.toBeNull();
+    });
+  });
+});
+
 describe('Client', () => {
   class TestClient extends Client {
     constructor(config: ClientConfig) {
@@ -15,21 +53,23 @@ describe('Client', () => {
   const MOCK_CONFIG: ClientConfig = {
     clientSecret: 'secret',
     clientId: 'clientId',
-    billingId: 'billingId',
-    stsUrl: 'authUrl',
+    authScheme: 'https',
+    authHost: 'accounts.dev.strmprivacy.io',
+    authEndpoint: '/auth/realms/streams/protocol/openid-connect/token',
   };
 
   const NOW_IN_MS = new Date('Tue Dec 02 2020 22:09:40 GMT+0100').getTime();
 
   const MOCK_TOKEN: JwtToken = {
-    expiresAt: NOW_IN_MS / 1000 + 60 * 60,
-    idToken: 'idToken',
-    refreshToken: 'refreshToken',
+    access_token: 'idToken',
+    refresh_token: 'refreshToken',
+    expires_in: 60,
+    expires_at: NOW_IN_MS + 60,
   };
 
   const MOCK_AUTH_RESPONSE: Http2Response<JwtToken> = { status: 200, data: MOCK_TOKEN };
 
-  const TIME_BEFORE_TOKEN_EXPIRES = MOCK_TOKEN.expiresAt * 1000 - NOW_IN_MS;
+  const TIME_BEFORE_TOKEN_EXPIRES = MOCK_TOKEN.expires_at * 1000 - NOW_IN_MS;
 
   let client: Client;
   let postSpy: jest.SpyInstance;
@@ -63,10 +103,10 @@ describe('Client', () => {
 
       expect(http.post).toHaveBeenCalledTimes(1);
       expect(http.post).toHaveBeenCalledWith(
-        'authUrl',
-        '/auth',
-        '{"billingId":"billingId","clientId":"clientId","clientSecret":"secret"}',
-        { 'content-type': 'application/json' }
+        'https://accounts.dev.strmprivacy.io',
+        '/auth/realms/streams/protocol/openid-connect/token',
+        'grant_type=client_credentials&client_id=clientId&client_secret=secret',
+        { 'content-type': 'application/x-www-form-urlencoded' }
       );
     });
 
@@ -85,7 +125,7 @@ describe('Client', () => {
       postSpy.mockResolvedValue({
         data: {
           ...MOCK_TOKEN,
-          expiresAt: NOW_IN_MS / 1000,
+          expires_at: NOW_IN_MS / 1000,
         },
       });
 
@@ -121,13 +161,16 @@ describe('Client', () => {
 
       await tick(TIME_BEFORE_REFRESH_ATTEMPT - 1);
 
-      expect(postSpy).not.toHaveBeenCalled();
-
       await tick(1);
 
-      expect(postSpy).toHaveBeenCalledWith('authUrl', '/refresh', JSON.stringify(MOCK_TOKEN), {
-        'content-type': 'application/json',
-      });
+      expect(postSpy).toHaveBeenCalledWith(
+        'https://accounts.dev.strmprivacy.io',
+        '/auth/realms/streams/protocol/openid-connect/token',
+        `grant_type=refresh_token&client_id=${MOCK_CONFIG.clientId}&client_secret=${MOCK_CONFIG.clientSecret}&refresh_token=refreshToken`,
+        {
+          'content-type': 'application/x-www-form-urlencoded',
+        }
+      );
     });
 
     it(`should retry ${Client.FAILED_REQUEST_RETRY_ATTEMPTS} times if refresh keeps failing`, async () => {

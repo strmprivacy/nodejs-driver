@@ -7,17 +7,19 @@ import { Http2Response, post } from './http';
  * Token definition
  */
 export interface JwtToken {
-  idToken: string;
-  refreshToken: string;
-  expiresAt: number;
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  expires_at: number;
 }
 
 /**
  * Config containing values needed to authenticate with the server.
  */
 export interface ClientConfig {
-  stsUrl: string;
-  billingId: string;
+  authScheme: string;
+  authHost: string;
+  authEndpoint: string;
   clientId: string;
   clientSecret: string;
 }
@@ -84,6 +86,14 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
     await this.scheduleRefresh(this.token);
   }
 
+  getAccessToken(): string | undefined {
+    return this.token?.access_token;
+  }
+
+  getToken(): JwtToken | undefined {
+    return this.token;
+  }
+
   disconnect(): void {
     /**
      * Clear refresh timeout
@@ -99,16 +109,12 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
   }
 
   private async authenticate(): Promise<JwtToken> {
-    const { data } = await post<JwtToken>(
-      this.config.stsUrl,
-      '/auth',
-      JSON.stringify({
-        billingId: this.config.billingId,
-        clientId: this.config.clientId,
-        clientSecret: this.config.clientSecret,
-      }),
+    const { data } = await post(
+      `${this.config.authScheme}://${this.config.authHost}`,
+      this.config.authEndpoint,
+      `grant_type=client_credentials&client_id=${this.config.clientId}&client_secret=${this.config.clientSecret}`,
       {
-        [constants.HTTP2_HEADER_CONTENT_TYPE]: 'application/json',
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: 'application/x-www-form-urlencoded',
       }
     );
     return data!;
@@ -155,19 +161,19 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
    * Returns the header used for auth.
    */
   protected getBearerHeader(): Record<'Authorization', string> | {} {
-    return this.token ? { Authorization: `Bearer ${this.token.idToken}` } : {};
+    return this.token ? { Authorization: `Bearer ${this.token.access_token}` } : {};
   }
 
   /**
    * Refreshes the token.
    */
-  private async refresh(oldToken: JwtToken): Promise<JwtToken> {
+  async refresh(oldToken: JwtToken): Promise<JwtToken> {
     const { data } = await post<JwtToken>(
-      this.config.stsUrl,
-      '/refresh',
-      JSON.stringify(oldToken),
+      `${this.config.authScheme}://${this.config.authHost}`,
+      this.config.authEndpoint,
+      `grant_type=refresh_token&client_id=${this.config.clientId}&client_secret=${this.config.clientSecret}&refresh_token=${oldToken.refresh_token}`,
       {
-        [constants.HTTP2_HEADER_CONTENT_TYPE]: 'application/json',
+        [constants.HTTP2_HEADER_CONTENT_TYPE]: 'application/x-www-form-urlencoded',
       }
     );
     return data!;
@@ -180,7 +186,7 @@ export abstract class Client<T = ClientEvents> extends (EventEmitter as {
     if (this.token === undefined) {
       return -1;
     }
-    const timeUntilExpirationInSec = this.token.expiresAt - new Date().getTime() / 1000;
+    const timeUntilExpirationInSec = this.token.expires_at - new Date().getTime() / 1000;
     return (timeUntilExpirationInSec - Client.SEC_BEFORE_EXPIRATION) * 1000;
   }
 }
