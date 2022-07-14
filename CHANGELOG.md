@@ -1,3 +1,13 @@
+# [3.0.0](https://github.com/strmprivacy/nodejs-driver/compare/v2.0.0...v3.0.0) (2022-07-14)
+
+### Features
+
+- **strm-1259:** remove billing id, authenticate with keycloak ([#8](https://github.com/strmprivacy/nodejs-driver/issues/8)) ([21969d6](https://github.com/strmprivacy/nodejs-driver/commit/21969d6930d5837b1e2fe417b10ead107f098b04))
+
+### BREAKING CHANGES
+
+- **strm-1259:** authentication has changed
+
 # [2.0.0](https://github.com/streammachineio/nodejs-driver/compare/v1.3.2...v2.0.0) (2021-11-11)
 
 ### Bug Fixes
